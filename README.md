@@ -1,5 +1,4 @@
-cat << 'EOF' > README.md
-# 🍴 Sabor Express – Otimizador de Rotas
+#  Sabor Express – Otimizador de Rotas
 
 Aplicação simples para **criar, reorganizar e otimizar rotas de entrega** usando:
 
@@ -11,7 +10,7 @@ Aplicação simples para **criar, reorganizar e otimizar rotas de entrega** usan
 
 ---
 
-## ⚡ Funcionalidades
+##  Funcionalidades
 
 ✅ Adicionar pontos manualmente ou clicando no mapa  
 ✅ Ícones A, B, C... personalizados para cada parada  
@@ -21,10 +20,41 @@ Aplicação simples para **criar, reorganizar e otimizar rotas de entrega** usan
 
 ---
 
-## 🚀 Como rodar localmente
+##  Como rodar localmente
 
 Clone o repositório:
 
 ```bash
 git clone https://github.com/seu-usuario/sabor-express.git
 cd sabor-express
+```
+
+## Build da imagem Docker
+
+```bash
+docker build -t sabor-express .
+```
+
+## Rodar o container
+
+```bash
+docker run -it --rm -p 8080:80 sabor-express
+```
+
+##  Estrutura do projeto
+
+```bash
+sabor-express/
+ ├── static/
+ │    └── index.html   # Interface da aplicação (Leaflet + OSRM + JS)
+ ├── Dockerfile        # Container Nginx para servir os arquivos
+ └── README.md         # Este arquivo
+```
+
+##  Créditos
+
+Mapas: [OpenStreetMap](https://www.openstreetmap.org/#map=4/-15.13/-53.19)
+
+Geocodificação: [Nominatim](https://nominatim.org/)
+
+Roteamento: [OSRM](https://project-osrm.org/)
