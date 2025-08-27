@@ -15,6 +15,7 @@ Aplicação simples para **criar, reorganizar e otimizar rotas de entrega** usan
 ✅ Adicionar pontos manualmente ou clicando no mapa  
 ✅ Ícones A, B, C... personalizados para cada parada  
 ✅ Lista lateral com arrastar para reordenar paradas 
+
 ✅ Botão para **otimizar rota automaticamente** (via OSRM Trip API)  
 ✅ Rota exibida no mapa com possibilidade de ajustes  
 
