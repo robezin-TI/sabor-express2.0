@@ -9,12 +9,10 @@
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin=""
   />
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
 
@@ -25,9 +23,8 @@
   />
   <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
-  <!-- SortableJS (drag & drop da lista lateral) -->
-  <script src="https://unpkg.com/sortablejs@1.15.2/modular/sortable.esm.js" type="module"></script>
-  <script nomodule src="https://unpkg.com/sortablejs@1.15.2/Sortable.min.js"></script>
+  <!-- SortableJS -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
   <style>
     :root{
@@ -54,8 +51,6 @@
     .actions{display:grid; grid-template-columns:1fr; gap:8px; margin-top:12px}
     .actions .row{display:grid; grid-template-columns:1fr 1fr; gap:8px}
     #map{width:100%; height:100%;}
-
-    /* badge A,B,C nos itens da lista */
     .badge{width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;font-weight:700;color:#fff;background:#111827}
     .footer{margin-top:8px}
     .hint{margin-top:6px; font-size:12px; color:var(--muted)}
@@ -93,18 +88,15 @@
 
 <script>
 (() => {
-  // ---------- MAPA ----------
-  const map = L.map('map', { zoomControl:true }).setView([-23.57, -46.63], 12); // SP como default
+  const map = L.map('map').setView([-23.57, -46.63], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap'
   }).addTo(map);
 
-  // ---------- ESTADO ----------
-  let stops = []; // { id, name, lat, lng, marker }
+  let stops = [];
   const listEl = document.getElementById('list');
 
-  // ---------- MARCADORES A, B, C ----------
   function letterIcon(letter) {
     return L.divIcon({
       className: 'letter-marker',
@@ -119,13 +111,12 @@
   }
   function updateMarkerLetters(){
     stops.forEach((s,i) => {
-      const letter = String.fromCharCode(65+i); // 65 = 'A'
+      const letter = String.fromCharCode(65+i);
       s.marker.setIcon(letterIcon(letter));
       s.marker.bindPopup(`<b>${letter}</b> ${s.name || `${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}`}`);
     });
   }
 
-  // ---------- LISTA LATERAL ----------
   function renderList(){
     listEl.innerHTML = '';
     stops.forEach((s,i) => {
@@ -156,7 +147,6 @@
       const del = document.createElement('button');
       del.className = 'x';
       del.textContent = '×';
-      del.title = 'Remover';
       del.onclick = () => removeStop(s.id);
 
       item.appendChild(left);
@@ -165,23 +155,21 @@
       listEl.appendChild(item);
     });
 
-    // ativa drag&drop (SortableJS)
-    // compatibilidade módulo/nomodule
-    const initSortable = () => new Sortable(listEl, {
-      handle: '.handle',
-      animation: 150,
-      onEnd: (evt) => {
-        const from = evt.oldIndex, to = evt.newIndex;
-        if (from === to) return;
-        const moved = stops.splice(from,1)[0];
-        stops.splice(to,0,moved);
-        updateMarkerLetters();
-        route(); // redesenha traçado após reordenar
-      }
-    });
-    // se Sortable tiver export ES Module, já foi carregado no <script type="module">,
-    // caso contrário usamos o global.
-    try { initSortable(); } catch(e){ window.Sortable && initSortable(); }
+    if (window.Sortable) {
+      new Sortable(listEl, {
+        handle: '.handle',
+        animation: 150,
+        onEnd: (evt) => {
+          const from = evt.oldIndex;
+          const to = evt.newIndex;
+          if (from === to) return;
+          const moved = stops.splice(from, 1)[0];
+          stops.splice(to, 0, moved);
+          updateMarkerLetters();
+          route();
+        }
+      });
+    }
   }
 
   function removeStop(id){
@@ -191,13 +179,12 @@
       stops.splice(idx,1);
       renderList();
       updateMarkerLetters();
-      routeControl && route(); // atualiza rota
+      route();
     }
   }
 
-  // ---------- ADICIONAR PONTO ----------
   function addStop(lat,lng,name=''){
-    const id = crypto.randomUUID ? crypto.randomUUID() : (Date.now()+'_'+Math.random());
+    const id = Date.now()+'_'+Math.random();
     const marker = L.marker([lat,lng], { draggable:true, icon:letterIcon('?') }).addTo(map);
     const s = { id, name, lat, lng, marker };
     stops.push(s);
@@ -206,7 +193,7 @@
       const { lat, lng } = e.target.getLatLng();
       s.lat = lat; s.lng = lng;
       updateMarkerLetters();
-      route(); // re-calcula
+      route();
     });
 
     renderList();
@@ -214,19 +201,15 @@
     fitToStops();
   }
 
-  // clique no mapa para adicionar
   map.on('click', (e) => addStop(e.latlng.lat, e.latlng.lng));
 
-  // busca (Nominatim)
   async function geocode(q){
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}`;
     const r = await fetch(url, { headers: { 'Accept-Language':'pt-BR' }});
-    if(!r.ok) throw new Error('Falha na geocodificação');
     const data = await r.json();
     return data.map(d => ({ lat: +d.lat, lng: +d.lon, display: d.display_name }));
   }
 
-  // campos UI
   const input = document.getElementById('search');
   document.getElementById('add').onclick = async () => {
     const q = input.value.trim();
@@ -236,35 +219,32 @@
       if(!first) { alert('Endereço não encontrado'); return; }
       addStop(first.lat, first.lng, q);
       input.value = '';
-    }catch(err){ console.error(err); alert('Erro ao buscar endereço.'); }
+    }catch(err){ alert('Erro ao buscar endereço.'); }
   };
 
-  // ---------- ROUTING ----------
-  // LRM com OSRM v1
   let routeControl = L.Routing.control({
     waypoints: [],
     router: L.Routing.osrmv1({
       serviceUrl: 'https://router.project-osrm.org/route/v1'
     }),
     showAlternatives: true,
-    addWaypoints: false, // desliga inserir arrastando a linha
+    addWaypoints: false,
     routeWhileDragging: false,
     draggableWaypoints: true,
     fitSelectedRoutes: false,
-    show: false // ocultamos o painel padrão do LRM (vamos usar nossa lista)
+    show: false,
+    createMarker: () => null // <- remove os pins azuis
   }).addTo(map);
 
   function lrmSetWaypoints(){
     const wps = stops.map(s => L.latLng(s.lat, s.lng));
     routeControl.setWaypoints(wps);
   }
-
   function fitToStops(){
     if(!stops.length) return;
     const group = L.featureGroup(stops.map(s => s.marker));
     map.fitBounds(group.getBounds().pad(0.25));
   }
-
   function route(){
     if(stops.length < 2){
       routeControl.setWaypoints([]);
@@ -275,37 +255,21 @@
   }
   document.getElementById('route').onclick = route;
 
-  // ---------- OTIMIZAÇÃO (OSRM Trip API) ----------
-  // Mantemos o primeiro como origem e o último como destino (roundtrip=false)
   async function optimize(){
     if(stops.length < 3){ route(); return; }
-
-    // monta "lon,lat;lon,lat;..."
     const coords = stops.map(s => `${s.lng},${s.lat}`).join(';');
     const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&destination=last&roundtrip=false&geometries=geojson`;
     const r = await fetch(url);
-    if(!r.ok){ alert('Falha ao otimizar a rota'); return; }
     const data = await r.json();
     if(data.code !== 'Ok'){ alert('OSRM não retornou solução.'); return; }
-
-    // a API devolve "waypoints" com "waypoint_index" (ordem sugerida)
-    // preservando origem (index 0) e destino (último)
-    const order = data.waypoints
-      .slice() // copia
-      .sort((a,b) => a.waypoint_index - b.waypoint_index)
-      .map(w => w.waypoint_index);
-
-    // aplica a nova ordem ao array stops
-    const sorted = order.map(i => stops[i]);
-    stops = sorted;
-
+    const order = data.waypoints.slice().sort((a,b)=>a.waypoint_index-b.waypoint_index).map(w=>w.waypoint_index);
+    stops = order.map(i => stops[i]);
     renderList();
     updateMarkerLetters();
     route();
   }
   document.getElementById('optimize').onclick = optimize;
 
-  // ---------- LIMPAR ----------
   document.getElementById('clear').onclick = () => {
     stops.forEach(s => map.removeLayer(s.marker));
     stops = [];
@@ -313,7 +277,6 @@
     routeControl.setWaypoints([]);
   };
 
-  // ---------- BOOT ----------
   renderList();
 })();
 </script>
