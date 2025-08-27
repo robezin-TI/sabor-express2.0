@@ -14,7 +14,7 @@ Aplicação simples para **criar, reorganizar e otimizar rotas de entrega** usan
 
 ✅ Adicionar pontos manualmente ou clicando no mapa  
 ✅ Ícones A, B, C... personalizados para cada parada  
-✅ Lista lateral com drag & drop para reordenar paradas  
+✅ Lista lateral com arrastar para reordenar paradas 
 ✅ Botão para **otimizar rota automaticamente** (via OSRM Trip API)  
 ✅ Rota exibida no mapa com possibilidade de ajustes  
 
@@ -25,8 +25,8 @@ Aplicação simples para **criar, reorganizar e otimizar rotas de entrega** usan
 Clone o repositório:
 
 ```bash
-git clone https://github.com/seu-usuario/sabor-express.git
-cd sabor-express
+git clone https://github.com/seu-usuario/sabor-express2.0.git
+cd sabor-express2.0
 ```
 
 ## Build da imagem Docker
