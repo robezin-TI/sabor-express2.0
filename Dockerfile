@@ -1,23 +1,20 @@
-# Imagem base oficial Python
 FROM python:3.11-slim
 
-# Define diretório de trabalho
+ENV PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# Instala dependências do sistema
-RUN apt-get update && apt-get install -y \
-    build-essential \
+# Dependências básicas de build; removemos cache depois
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia requirements e instala dependências
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
-# Copia todo o projeto para dentro do container
 COPY . .
 
-# Expondo porta padrão
 EXPOSE 8000
-
-# Comando para rodar o servidor
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["python", "app.py"]
