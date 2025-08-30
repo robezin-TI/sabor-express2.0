@@ -1,36 +1,21 @@
-# api/ml_model.py
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
+from typing import List, Dict, Any
 import numpy as np
+from sklearn.linear_model import LinearRegression
 
-class DeliveryTimeModel:
+def predict_demand(historical_data: List[float], horizon: int = 3) -> Dict[str, Any]:
     """
-    Simple wrapper for training and predicting delivery times.
-    Stores the trained model in-memory.
+    Previsão simples de tendência (regressão linear).
     """
+    y = np.array(historical_data, dtype=float)
+    X = np.arange(len(y), dtype=float).reshape(-1, 1)
 
-    def __init__(self, model_type="rf"):
-        self.model_type = model_type
-        self.model = None
-        self._init_model()
+    model = LinearRegression()
+    model.fit(X, y)
 
-    def _init_model(self):
-        if self.model_type == "linear":
-            self.model = LinearRegression()
-        else:
-            self.model = RandomForestRegressor(n_estimators=100, random_state=42)
+    future_idx = np.arange(len(y), len(y) + horizon, dtype=float).reshape(-1, 1)
+    preds = model.predict(future_idx)
 
-    def train(self, X, y):
-        X = np.array(X, dtype=float)
-        y = np.array(y, dtype=float)
-        if len(y) == 0:
-            raise ValueError("Empty training data")
-        self.model.fit(X, y)
-        return {"trained": True, "n_samples": len(y)}
-
-    def predict(self, X):
-        if self.model is None:
-            raise RuntimeError("Model not initialized/trained")
-        X = np.array(X, dtype=float)
-        preds = self.model.predict(X)
-        return preds.tolist()
+    return {
+        "horizon": horizon,
+        "predictions": [float(v) for v in preds]
+    }
