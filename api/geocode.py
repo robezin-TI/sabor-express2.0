@@ -1,20 +1,20 @@
-# api/geocode.py
 import requests
-from urllib.parse import urlencode
 
-NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-HEADERS = {"User-Agent": "SaborExpress/1.0", "Accept-Language": "pt-BR"}
+USER_AGENT = "sabor-express/1.0 (contato: dev@saborexpress.local)"
 
-def geocode_address(address, limit=1):
+def geocode_address(address: str):
     """
-    Consulta Nominatim e retorna o primeiro candidato: {lat, lon, display_name}
+    Consulta Nominatim (OSM) para obter coordenadas de um endereço.
+    Retorna: {"lat": float, "lon": float} ou {"error": "..."}
     """
-    params = {"q": address, "format": "jsonv2", "limit": limit, "addressdetails": 0}
-    url = f"{NOMINATIM_URL}?{urlencode(params)}"
-    r = requests.get(url, headers=HEADERS, timeout=10)
-    r.raise_for_status()
-    data = r.json()
-    if not data:
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {"q": address, "format": "json", "limit": 1}
+    try:
+        r = requests.get(url, params=params, headers={"User-Agent": USER_AGENT}, timeout=15)
+        r.raise_for_status()
+        data = r.json()
+        if data:
+            return {"lat": float(data[0]["lat"]), "lon": float(data[0]["lon"])}
         return {"error": "Endereço não encontrado"}
-    first = data[0]
-    return {"lat": float(first["lat"]), "lon": float(first["lon"]), "display_name": first.get("display_name")}
+    except requests.RequestException as e:
+        return {"error": f"Falha na geocodificação: {e}"}
