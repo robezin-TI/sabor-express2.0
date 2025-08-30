@@ -1,1 +1,1 @@
-# Mantém o pacote inicializável
+# apenas para marcar a pasta como módulo
