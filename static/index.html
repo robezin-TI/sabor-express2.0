@@ -1,24 +1,47 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
+<!doctype html>
+<html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8" />
   <title>Sabor Express</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
-  <h2>Sabor Express - Otimização de Rotas</h2>
-  <div id="controls">
-    <input id="address" placeholder="Digite um endereço">
-    <button onclick="addAddress()">Adicionar Endereço</button>
-    <button onclick="clusterPoints()">Clusterizar</button>
-    <button onclick="optimizeRoute()">Otimizar Rota</button>
-    <button onclick="trainModel()">Treinar ML</button>
-    <button onclick="predictTime()">Prever Tempo</button>
-  </div>
-  <div id="map"></div>
+  <div class="app">
+    <aside class="sidebar">
+      <h1>Sabor Express</h1>
+      <div class="input-row">
+        <input id="search" placeholder="Digite um endereço (ou clique no mapa)" />
+        <button id="add" class="btn gray">Adicionar</button>
+      </div>
+      <div class="hint">Dica: você pode clicar no mapa para adicionar um ponto.</div>
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+      <div id="list" class="list"></div>
+
+      <div class="actions">
+        <div class="row">
+          <button id="optimize" class="btn primary">Otimizar rota (OSRM)</button>
+          <button id="route" class="btn gray">Traçar rota</button>
+        </div>
+        <button id="cluster" class="btn gray">Clusterizar (K-Means)</button>
+        <button id="train" class="btn gray">Treinar ML (exemplo)</button>
+        <button id="predict" class="btn gray">Prever tempo</button>
+        <button id="clear" class="btn danger">Limpar tudo</button>
+      </div>
+
+      <div class="footer muted">
+        <p>Arraste os itens para reordenar (A, B, C… atualizam automaticamente).</p>
+        <p>Geocodificação: Nominatim (OSM). Roteamento: OSRM (fallback A* via OSMnx).</p>
+      </div>
+    </aside>
+
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
