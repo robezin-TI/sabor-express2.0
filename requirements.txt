@@ -1,6 +1,6 @@
-flask
-requests
-osmnx
-networkx
-scikit-learn
-numpy
+flask>=2.0
+requests>=2.0
+osmnx>=1.2
+networkx>=3.0
+scikit-learn>=1.0
+numpy>=1.20
