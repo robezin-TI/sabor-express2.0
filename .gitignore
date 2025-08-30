@@ -1,13 +1,5 @@
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-*.db
 .env
-.venv
-env/
-venv/
-*.log
-.cache/
-.pytest_cache/
-.ipynb_checkpoints
+.vscode/
+*.db
