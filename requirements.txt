@@ -2,3 +2,5 @@ flask
 requests
 osmnx
 networkx
+scikit-learn
+numpy
