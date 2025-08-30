@@ -1,6 +1,9 @@
-flask>=2.0
-requests>=2.0
-osmnx>=1.2
-networkx>=3.0
-scikit-learn>=1.0
-numpy>=1.20
+fastapi
+uvicorn
+requests
+scikit-learn
+networkx
+pandas
+numpy
+python-dotenv
+jinja2
