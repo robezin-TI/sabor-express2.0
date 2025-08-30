@@ -2,15 +2,37 @@
 <html lang="pt-br">
 <head>
   <meta charset="utf-8" />
-  <title>Sabor Express</title>
+  <title>Sabor Express – Otimizador de Rotas (OSRM)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin=""
+  ></script>
+
+  <!-- Leaflet Routing Machine -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"
+  />
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+  <!-- SortableJS -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 </head>
 <body>
   <div class="app">
     <aside class="sidebar">
       <h1>Sabor Express</h1>
+
       <div class="input-row">
         <input id="search" placeholder="Digite um endereço (ou clique no mapa)" />
         <button id="add" class="btn gray">Adicionar</button>
@@ -24,24 +46,18 @@
           <button id="optimize" class="btn primary">Otimizar rota (OSRM)</button>
           <button id="route" class="btn gray">Traçar rota</button>
         </div>
-        <button id="cluster" class="btn gray">Clusterizar (K-Means)</button>
-        <button id="train" class="btn gray">Treinar ML (exemplo)</button>
-        <button id="predict" class="btn gray">Prever tempo</button>
         <button id="clear" class="btn danger">Limpar tudo</button>
       </div>
 
       <div class="footer muted">
         <p>Arraste os itens para reordenar (A, B, C… atualizam automaticamente).</p>
-        <p>Geocodificação: Nominatim (OSM). Roteamento: OSRM (fallback A* via OSMnx).</p>
+        <p>Geocodificação: Nominatim (OSM). Roteamento: OSRM.</p>
       </div>
     </aside>
 
     <div id="map"></div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
