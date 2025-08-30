@@ -1,20 +1,18 @@
-# api/clustering.py
-from sklearn.cluster import KMeans
+from typing import List, Dict, Any
 import numpy as np
+from sklearn.cluster import KMeans
 
-def cluster_points(points, n_clusters=3):
+def cluster_points(points: List[Dict[str, float]], k: int = 3) -> Dict[str, Any]:
     """
-    points: list of dicts with keys 'lat' and 'lon'
-    returns: (points_with_cluster, centers)
+    Agrupa pontos (lat, lon) em k clusters via KMeans.
     """
-    if not points:
-        return [], []
-
-    coords = np.array([[p["lat"], p["lon"]] for p in points], dtype=float)
-    n_clusters = max(1, min(n_clusters, len(points)))
-    km = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
-    labels = km.fit_predict(coords)
+    if k < 1:
+        k = 1
+    X = np.array([[p["lat"], p["lon"]] for p in points], dtype=float)
+    km = KMeans(n_clusters=min(k, len(points)), n_init=10, random_state=42)
+    labels = km.fit_predict(X)
     centers = km.cluster_centers_.tolist()
-    for i, p in enumerate(points):
-        p["cluster"] = int(labels[i])
-    return points, centers
+    return {
+        "labels": labels.tolist(),
+        "centers": [{"lat": float(c[0]), "lon": float(c[1])} for c in centers]
+    }
