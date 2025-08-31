@@ -1,1 +1,1 @@
-# apenas para marcar a pasta como módulo
+# deixa o pacote importável
