@@ -1,20 +1,18 @@
+# Build leve para servir Flask + estáticos
 FROM python:3.11-slim
 
-ENV PIP_NO_CACHE_DIR=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-WORKDIR /app
-
-# Dependências básicas de build; removemos cache depois
+# Dependências do OSMnx
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl ca-certificates \
+    build-essential gcc libspatialindex-dev libgeos-dev libproj-dev proj-bin \
     && rm -rf /var/lib/apt/lists/*
 
+WORKDIR /app
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+ENV PORT=8000
 EXPOSE 8000
+
 CMD ["python", "app.py"]
