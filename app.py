@@ -1,53 +1,51 @@
+import os
 from flask import Flask, request, jsonify, send_from_directory
 from api.geocode import geocode_address
 from api.optimizer import optimize_routes
-from api.clustering import cluster_points
-from api.ml_model import predict_demand
+from api.clustering import kmeans_clusters
+from api.ml_model import MODEL
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
+# ---------- Static ----------
 @app.route("/")
 def index():
     return send_from_directory("static", "index.html")
 
-# --- Geocoding (Nominatim) ---
-@app.route("/geocode", methods=["POST"])
-def geocode():
-    data = request.get_json(force=True)
-    address = data.get("address", "").strip()
-    if not address:
-        return jsonify({"error": "Informe um endereço."}), 400
-    return jsonify(geocode_address(address))
+# ---------- API ----------
+@app.route("/api/geocode", methods=["POST"])
+def api_geocode():
+    data = request.get_json(silent=True) or {}
+    address = data.get("address", "")
+    res = geocode_address(address)
+    return jsonify(res), (200 if "error" not in res else 400)
 
-# --- Roteamento local com A* em grafo OSM (ordem já fornecida) ---
-@app.route("/optimize", methods=["POST"])
-def optimize():
-    data = request.get_json(force=True)
+@app.route("/api/astar", methods=["POST"])
+def api_astar():
+    data = request.get_json(silent=True) or {}
     points = data.get("points", [])
-    if not isinstance(points, list) or len(points) < 2:
-        return jsonify({"error": "Mínimo de 2 pontos necessários"}), 400
-    result = optimize_routes(points, speed_kmh=40.0)
-    return jsonify(result)
+    if len(points) < 2:
+        return jsonify({"error": "Envie ao menos 2 pontos"}), 400
+    nodes, dist_km, time_min = optimize_routes(points)
+    return jsonify({"nodes": nodes, "distance_km": dist_km, "time_min": time_min})
 
-# --- Agrupamento KMeans (para análises) ---
-@app.route("/cluster", methods=["POST"])
-def cluster():
-    data = request.get_json(force=True)
+@app.route("/api/cluster", methods=["POST"])
+def api_cluster():
+    data = request.get_json(silent=True) or {}
     points = data.get("points", [])
-    k = int(data.get("k", 3))
-    if not isinstance(points, list) or len(points) < 1:
-        return jsonify({"error": "Envie uma lista de pontos {lat, lon}"}), 400
-    return jsonify(cluster_points(points, k))
+    k = int(data.get("k", 2))
+    res = kmeans_clusters(points, k=k)
+    return jsonify(res)
 
-# --- Exemplo ML simples (previsão de demanda) ---
-@app.route("/predict", methods=["POST"])
-def predict():
-    data = request.get_json(force=True)
-    series = data.get("historical_data", [])
-    if not series or not isinstance(series, list):
-        return jsonify({"error": "Envie historical_data como lista numérica"}), 400
-    return jsonify(predict_demand(series, horizon=3))
+@app.route("/api/ml/predict", methods=["POST"])
+def api_predict():
+    data = request.get_json(silent=True) or {}
+    distance_km = float(data.get("distance_km", 0))
+    stops = int(data.get("stops", 0))
+    pred = MODEL.predict(distance_km, stops)
+    return jsonify({"prediction_min": round(pred, 2)})
 
+# ---------- Run ----------
 if __name__ == "__main__":
-    # Porta 8000 p/ harmonizar com Docker/Actions
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port, debug=True)
