@@ -1,18 +1,17 @@
-# Build leve para servir Flask + estáticos
-FROM python:3.11-slim
+# Usando Node.js para servir a aplicação
+FROM node:18-alpine
 
-# Dependências do OSMnx
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential gcc libspatialindex-dev libgeos-dev libproj-dev proj-bin \
-    && rm -rf /var/lib/apt/lists/*
-
+# Cria a pasta de trabalho
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
+# Copia os arquivos do projeto
 COPY . .
 
-ENV PORT=8000
-EXPOSE 8000
+# Instala um servidor HTTP simples (serve)
+RUN npm install -g serve
 
-CMD ["python", "app.py"]
+# Expõe a porta que será usada
+EXPOSE 3000
+
+# Comando para rodar o servidor
+CMD ["serve", "-s", ".", "-l", "3000"]
