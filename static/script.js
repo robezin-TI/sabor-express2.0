@@ -1,116 +1,64 @@
-// Inicializa mapa
-const map = L.map('map').setView([-23.5505, -46.6333], 12);
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <title>Sabor Express – Otimizador de Rotas</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-// Tile OSM
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap'
-}).addTo(map);
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-let waypoints = [];
-let markers = [];
-let routingControl = null;
+  <!-- Leaflet Routing Machine (usamos só como engine; painel é nosso) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
-// Função para atualizar letras dos marcadores
-function updateMarkers() {
-  markers.forEach((m, i) => {
-    m.setIcon(L.divIcon({
-      className: 'custom-marker',
-      html: String.fromCharCode(65 + i), // A, B, C...
-      iconSize: [30, 30],
-      iconAnchor: [15, 30]
-    }));
-  });
-}
+  <!-- SortableJS (drag & drop) -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
-// Clique no mapa para adicionar ponto
-map.on('click', (e) => {
-  addPoint(e.latlng);
-});
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h1>Sabor Express</h1>
 
-function addPoint(latlng) {
-  const marker = L.marker(latlng, {
-    draggable: true
-  }).addTo(map);
+      <div class="input-row">
+        <input id="search" placeholder="Digite um endereço (ou clique no mapa)" />
+        <button id="add" class="btn gray">Adicionar</button>
+      </div>
+      <div class="hint">Dica: você pode clicar no mapa para adicionar um ponto.</div>
 
-  marker.on('dragend', () => {
-    const idx = markers.indexOf(marker);
-    if (idx >= 0) {
-      waypoints[idx] = marker.getLatLng();
-    }
-  });
+      <div id="list" class="list"></div>
 
-  markers.push(marker);
-  waypoints.push(latlng);
-  updateMarkers();
-  renderList();
-}
+      <div class="actions">
+        <div class="row">
+          <button id="optimize" class="btn primary">Otimizar rota (OSRM)</button>
+          <button id="route" class="btn gray">Traçar rota</button>
+        </div>
+        <button id="clear" class="btn danger">Limpar tudo</button>
+      </div>
 
-// Renderiza lista lateral
-function renderList() {
-  const list = document.getElementById('list');
-  list.innerHTML = '';
-  waypoints.forEach((wp, i) => {
-    const item = document.createElement('div');
-    item.className = 'list-item';
-    item.textContent = `${String.fromCharCode(65 + i)}: ${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}`;
-    list.appendChild(item);
-  });
+      <div class="footer muted">
+        <p>Arraste os itens para reordenar (A, B, C… atualizam automaticamente).</p>
+        <p>Geocodificação: Nominatim (OSM). Roteamento: OSRM.</p>
+      </div>
+    </aside>
 
-  Sortable.create(list, {
-    onEnd: (evt) => {
-      const [moved] = waypoints.splice(evt.oldIndex, 1);
-      waypoints.splice(evt.newIndex, 0, moved);
+    <div id="map"></div>
 
-      const [movedMarker] = markers.splice(evt.oldIndex, 1);
-      markers.splice(evt.newIndex, 0, movedMarker);
+    <div id="directions" class="directions hidden">
+      <div class="dir-header">
+        <div>
+          <div class="dir-title">Resumo da rota</div>
+          <div id="dir-summary" class="dir-summary">—</div>
+        </div>
+        <button id="close-directions" title="Fechar">×</button>
+      </div>
+      <ol id="dir-steps" class="dir-steps"></ol>
+    </div>
+  </div>
 
-      updateMarkers();
-      renderList();
-    }
-  });
-}
-
-// Botão limpar
-document.getElementById('clear').onclick = () => {
-  markers.forEach(m => map.removeLayer(m));
-  markers = [];
-  waypoints = [];
-  if (routingControl) {
-    map.removeControl(routingControl);
-    routingControl = null;
-  }
-  document.getElementById('directions').classList.add('hidden');
-};
-
-// Botão traçar rota
-document.getElementById('route').onclick = () => {
-  if (routingControl) {
-    map.removeControl(routingControl);
-  }
-  routingControl = L.Routing.control({
-    waypoints: waypoints,
-    lineOptions: { styles: [{ color: 'blue', weight: 4 }] },
-    createMarker: () => null
-  }).addTo(map);
-
-  routingControl.on('routesfound', (e) => {
-    const routes = e.routes[0];
-    const summary = `${(routes.summary.totalDistance / 1000).toFixed(1)} km, ${(routes.summary.totalTime / 60).toFixed(0)} min`;
-    document.getElementById('dir-summary').textContent = summary;
-
-    const steps = document.getElementById('dir-steps');
-    steps.innerHTML = '';
-    routes.instructions.forEach(inst => {
-      const li = document.createElement('li');
-      li.textContent = inst.text;
-      steps.appendChild(li);
-    });
-
-    document.getElementById('directions').classList.remove('hidden');
-  });
-};
-
-// Fechar painel
-document.getElementById('close-directions').onclick = () => {
-  document.getElementById('directions').classList.add('hidden');
-};
+  <script src="./script.js"></script>
+</body>
+</html>
