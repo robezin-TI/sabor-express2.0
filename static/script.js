@@ -99,12 +99,12 @@ function updateRoute() {
     if (routeControl) map.removeControl(routeControl);
     if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
     document.getElementById('directions').classList.add('hidden');
-    document.getElementById('dir-steps').innerHTML = '';
     return;
   }
 
   const waypoints = markers.map(m => L.latLng(m.getLatLng()));
-  if (routeControl) map.removeControl(routeControl);
+
+  // Remove rota antiga
   if (routeLine) map.removeLayer(routeLine);
 
   routeControl = L.Routing.control({
@@ -113,35 +113,22 @@ function updateRoute() {
     addWaypoints: false,
     draggableWaypoints: false,
     fitSelectedRoutes: true,
-    show: false,
-    language: 'pt'
+    show: false
   }).addTo(map);
 
   routeControl.on('routesfound', function(e) {
     const route = e.routes[0];
-    const summary = `${(route.summary.totalDistance/1000).toFixed(2)} km, ${(route.summary.totalTime/60).toFixed(0)} min`;
 
-    const stepsContainer = document.getElementById('dir-steps');
-    stepsContainer.innerHTML = '';
-
-    // Exibe passos da rota
-    route.instructions.forEach((step, i) => {
-      const li = document.createElement('li');
-      li.className = 'dir-step';
-      li.innerHTML = `<div class="dir-ico">${i+1}</div><div class="dir-txt">${step.text}</div>`;
-      stepsContainer.appendChild(li);
-    });
-
-    // Exibe nomes personalizados dos pontos no resumo
-    const dirSummary = document.getElementById('dir-summary');
-    const waypointNames = markers.map((m, i) => listEl.children[i].querySelector('input').value);
-    dirSummary.innerText = `${summary} – ${waypointNames.join(' → ')}`;
-
-    document.getElementById('directions').classList.remove('hidden');
-
+    // Traça a rota no mapa
     const latlngs = route.coordinates.map(c => [c.lat, c.lng]);
     routeLine = L.polyline(latlngs, { color: '#2563eb', weight: 5 }).addTo(map);
     map.fitBounds(routeLine.getBounds(), { padding: [50,50] });
+
+    // Painel de direções
+    const summary = `${(route.summary.totalDistance/1000).toFixed(2)} km, ${(route.summary.totalTime/60).toFixed(0)} min`;
+    const waypointNames = markers.map((m, i) => listEl.children[i].querySelector('input').value);
+    document.getElementById('dir-summary').innerText = `${summary} – ${waypointNames.join(' → ')}`;
+    document.getElementById('directions').classList.remove('hidden');
   });
 }
 
@@ -200,9 +187,8 @@ document.getElementById('optimize').addEventListener('click', async () => {
 
     newMarkers.forEach((m, idx) => {
       m.addTo(map);
-      m.bindPopup(`Ponto ${idx+1}`).openPopup();
       markers.push(m);
-      addListItem(m.getPopup().getContent());
+      addListItem(`Ponto ${idx+1}`);
     });
 
     const routeCoords = data.trips[0].geometry.coordinates.map(c => [c[1], c[0]]);
