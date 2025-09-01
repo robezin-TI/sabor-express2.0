@@ -1,70 +1,63 @@
 // Inicializa o mapa
 const map = L.map('map').setView([-23.55052, -46.633308], 12);
-
-// Tile layer do OpenStreetMap
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
-// Array para marcadores e rota
 let markers = [];
 let routeControl = null;
+let routeLine = null;
+let vehicleMarker = null;
+let animationInterval = null;
 
-// Função para adicionar marcador
+// Adiciona marcador
 function addMarker(latlng, label) {
   const marker = L.marker(latlng, { draggable: true })
     .addTo(map)
     .bindPopup(label)
     .openPopup();
-
-  marker.on('dragend', updateRoute); // Atualiza rota ao arrastar
+  marker.on('dragend', updateRoute);
   markers.push(marker);
   updateRoute();
 }
 
-// Função para limpar marcadores e rota
+// Limpar tudo
 function clearMarkers() {
   markers.forEach(m => map.removeLayer(m));
   markers = [];
-  if (routeControl) {
-    map.removeControl(routeControl);
-    routeControl = null;
-  }
+  if (routeControl) { map.removeControl(routeControl); routeControl = null; }
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+  if (vehicleMarker) { map.removeLayer(vehicleMarker); vehicleMarker = null; }
+  if (animationInterval) { clearInterval(animationInterval); animationInterval = null; }
   document.getElementById('dir-steps').innerHTML = '';
   document.getElementById('directions').classList.add('hidden');
 }
 
-// Função de geocoding via Nominatim
+// Geocoding via Nominatim
 async function geocode(address) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
   const res = await fetch(url);
   const data = await res.json();
-  if (data.length > 0) {
-    return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-  }
+  if (data.length > 0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
   return null;
 }
 
-// Atualiza a rota usando Leaflet Routing Machine + OSRM
+// Atualiza rota e painel
 function updateRoute() {
   if (markers.length < 2) {
-    if (routeControl) {
-      map.removeControl(routeControl);
-      routeControl = null;
-    }
+    if (routeControl) map.removeControl(routeControl);
+    if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
     document.getElementById('directions').classList.add('hidden');
     document.getElementById('dir-steps').innerHTML = '';
     return;
   }
 
   const waypoints = markers.map(m => L.latLng(m.getLatLng()));
-
-  if (routeControl) {
-    map.removeControl(routeControl);
-  }
+  if (routeControl) map.removeControl(routeControl);
+  if (routeLine) map.removeLayer(routeLine);
 
   routeControl = L.Routing.control({
-    waypoints: waypoints,
+    waypoints,
     lineOptions: { styles: [{ color: '#2563eb', weight: 5 }] },
     addWaypoints: false,
     draggableWaypoints: false,
@@ -72,11 +65,11 @@ function updateRoute() {
     show: false
   }).addTo(map);
 
-  // Atualiza painel de direções
   routeControl.on('routesfound', function(e) {
     const route = e.routes[0];
-    const summary = `${(route.summary.totalDistance / 1000).toFixed(2)} km, ${(route.summary.totalTime/60).toFixed(0)} min`;
+    const summary = `${(route.summary.totalDistance/1000).toFixed(2)} km, ${(route.summary.totalTime/60).toFixed(0)} min`;
     document.getElementById('dir-summary').innerText = summary;
+
     const stepsContainer = document.getElementById('dir-steps');
     stepsContainer.innerHTML = '';
     route.instructions.forEach((step, i) => {
@@ -89,42 +82,80 @@ function updateRoute() {
   });
 }
 
-// Evento clique no mapa
+// Função para animar veículo ao longo da rota
+function animateVehicle(routeCoords, speed = 100) {
+  if (vehicleMarker) map.removeLayer(vehicleMarker);
+  if (animationInterval) clearInterval(animationInterval);
+
+  let index = 0;
+  vehicleMarker = L.marker(routeCoords[0], { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', iconSize: [32,32] }) }).addTo(map);
+
+  animationInterval = setInterval(() => {
+    index++;
+    if (index >= routeCoords.length) {
+      clearInterval(animationInterval);
+      animationInterval = null;
+      return;
+    }
+    vehicleMarker.setLatLng(routeCoords[index]);
+    map.panTo(routeCoords[index]);
+  }, speed);
+}
+
+// Clique no mapa
 map.on('click', e => addMarker(e.latlng, `Ponto ${markers.length + 1}`));
 
-// Botão Adicionar endereço
+// Adicionar endereço
 document.getElementById('add').addEventListener('click', async () => {
   const input = document.getElementById('search');
   const address = input.value.trim();
-  if (address === '') return;
-
+  if (!address) return;
   const latlng = await geocode(address);
   if (latlng) {
     addMarker(latlng, address);
     map.setView(latlng, 14);
     input.value = '';
-  } else {
-    alert('Endereço não encontrado!');
-  }
+  } else alert('Endereço não encontrado!');
 });
 
-// Botão Limpar tudo
+// Limpar
 document.getElementById('clear').addEventListener('click', clearMarkers);
 
-// Botão Fechar painel
+// Fechar painel
 document.getElementById('close-directions').addEventListener('click', () => {
   document.getElementById('directions').classList.add('hidden');
 });
 
-// Botão Traçar rota
+// Traçar rota
 document.getElementById('route').addEventListener('click', updateRoute);
 
-// Botão Otimizar rota (simples: apenas reordena marcadores pela distância)
-document.getElementById('optimize').addEventListener('click', () => {
-  if (markers.length < 3) return; // pouca coisa pra otimizar
+// Otimizar rota com OSRM Trip API e animar veículo
+document.getElementById('optimize').addEventListener('click', async () => {
+  if (markers.length < 3) return;
 
-  // Ordena por longitude (exemplo simples de “otimização”)
-  markers.sort((a,b) => a.getLatLng().lng - b.getLatLng().lng);
+  const coords = markers.map(m => `${m.getLatLng().lng},${m.getLatLng().lat}`).join(';');
+  const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&roundtrip=false&overview=full&geometries=geojson`;
 
-  updateRoute();
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data.code === 'Ok') {
+    const order = data.trips[0].waypoint_order;
+    const newMarkers = order.map(i => markers[i]);
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+    newMarkers.forEach((m, idx) => {
+      m.addTo(map);
+      m.bindPopup(`Ponto ${idx+1}`).openPopup();
+      markers.push(m);
+    });
+
+    const routeCoords = data.trips[0].geometry.coordinates.map(c => [c[1], c[0]]);
+    if (routeLine) map.removeLayer(routeLine);
+    routeLine = L.polyline(routeCoords, { color: '#2563eb', weight: 5 }).addTo(map);
+    map.fitBounds(routeLine.getBounds(), { padding: [50,50] });
+
+    updateRoute();
+    animateVehicle(routeCoords, 200); // velocidade ajustável (ms por passo)
+  } else alert('Não foi possível otimizar a rota!');
 });
