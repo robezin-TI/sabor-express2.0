@@ -1,64 +1,76 @@
-<!doctype html>
-<html lang="pt-br">
-<head>
-  <meta charset="utf-8" />
-  <title>Sabor Express – Otimizador de Rotas</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+// Inicializa o mapa
+const map = L.map('map').setView([-23.55052, -46.633308], 12); // São Paulo como exemplo
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+// Adiciona o tile layer do OpenStreetMap
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
 
-  <!-- Leaflet Routing Machine (usamos só como engine; painel é nosso) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
-  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+// Array para armazenar marcadores
+let markers = [];
 
-  <!-- SortableJS (drag & drop) -->
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+// Função para adicionar marcador no mapa
+function addMarker(latlng, label) {
+  const marker = L.marker(latlng, {
+    draggable: true
+  }).addTo(map)
+    .bindPopup(label)
+    .openPopup();
 
-  <link rel="stylesheet" href="./style.css" />
-</head>
-<body>
-  <div class="app">
-    <aside class="sidebar">
-      <h1>Sabor Express</h1>
+  markers.push(marker);
+  updateRoute();
+}
 
-      <div class="input-row">
-        <input id="search" placeholder="Digite um endereço (ou clique no mapa)" />
-        <button id="add" class="btn gray">Adicionar</button>
-      </div>
-      <div class="hint">Dica: você pode clicar no mapa para adicionar um ponto.</div>
+// Função para limpar todos os marcadores
+function clearMarkers() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  updateRoute();
+}
 
-      <div id="list" class="list"></div>
+// Função para atualizar a rota (placeholder)
+// Aqui você conectaria com a lógica do OSRM ou seu painel de direções
+function updateRoute() {
+  // TODO: lógica de rotas e preenchimento do painel de direções
+  if (markers.length > 1) {
+    document.getElementById('directions').classList.remove('hidden');
+    document.getElementById('dir-summary').innerText = `${markers.length} pontos na rota`;
+  } else {
+    document.getElementById('directions').classList.add('hidden');
+  }
+}
 
-      <div class="actions">
-        <div class="row">
-          <button id="optimize" class="btn primary">Otimizar rota (OSRM)</button>
-          <button id="route" class="btn gray">Traçar rota</button>
-        </div>
-        <button id="clear" class="btn danger">Limpar tudo</button>
-      </div>
+// Evento de clique no mapa para adicionar ponto
+map.on('click', function(e) {
+  addMarker(e.latlng, `Ponto ${markers.length + 1}`);
+});
 
-      <div class="footer muted">
-        <p>Arraste os itens para reordenar (A, B, C… atualizam automaticamente).</p>
-        <p>Geocodificação: Nominatim (OSM). Roteamento: OSRM.</p>
-      </div>
-    </aside>
+// Eventos dos botões
+document.getElementById('add').addEventListener('click', () => {
+  const input = document.getElementById('search');
+  if (input.value.trim() !== '') {
+    // Aqui você faria geocoding real (ex: Nominatim)
+    // Para teste, adiciona marcador central
+    addMarker(map.getCenter(), input.value);
+    input.value = '';
+  }
+});
 
-    <div id="map"></div>
+document.getElementById('clear').addEventListener('click', () => {
+  clearMarkers();
+  document.getElementById('dir-steps').innerHTML = '';
+});
 
-    <div id="directions" class="directions hidden">
-      <div class="dir-header">
-        <div>
-          <div class="dir-title">Resumo da rota</div>
-          <div id="dir-summary" class="dir-summary">—</div>
-        </div>
-        <button id="close-directions" title="Fechar">×</button>
-      </div>
-      <ol id="dir-steps" class="dir-steps"></ol>
-    </div>
-  </div>
+// Fechar painel de direções
+document.getElementById('close-directions').addEventListener('click', () => {
+  document.getElementById('directions').classList.add('hidden');
+});
 
-  <script src="./script.js"></script>
-</body>
-</html>
+// Aqui você pode adicionar as funções de "Traçar rota" e "Otimizar rota" conectando com OSRM
+document.getElementById('route').addEventListener('click', () => {
+  updateRoute();
+});
+
+document.getElementById('optimize').addEventListener('click', () => {
+  updateRoute();
+});
