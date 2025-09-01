@@ -10,14 +10,67 @@ let routeLine = null;
 let vehicleMarker = null;
 let animationInterval = null;
 
-// Adiciona marcador
+// Inicializa Sortable para drag & drop
+const listEl = document.getElementById('list');
+const sortable = Sortable.create(listEl, {
+  animation: 150,
+  onEnd: function() {
+    // Reordena marcadores conforme lista
+    const newOrder = [];
+    listEl.querySelectorAll('.stop').forEach(item => {
+      const index = parseInt(item.dataset.index);
+      newOrder.push(markers[index]);
+    });
+    markers = newOrder;
+    updateRoute();
+    // Atualiza dataset e labels
+    markers.forEach((m, i) => {
+      m.bindPopup(listEl.children[i].querySelector('input').value);
+      listEl.children[i].dataset.index = i;
+    });
+  }
+});
+
+// Adiciona item na lista lateral
+function addListItem(label) {
+  const div = document.createElement('div');
+  div.className = 'stop';
+  div.dataset.index = markers.length - 1;
+
+  div.innerHTML = `
+    <div class="handle">≡</div>
+    <input value="${label}" />
+    <button class="x">×</button>
+  `;
+  listEl.appendChild(div);
+
+  const inputEl = div.querySelector('input');
+  inputEl.addEventListener('input', () => {
+    const idx = parseInt(div.dataset.index);
+    markers[idx].bindPopup(inputEl.value);
+  });
+
+  // Botão remover
+  div.querySelector('.x').addEventListener('click', () => {
+    const idx = parseInt(div.dataset.index);
+    map.removeLayer(markers[idx]);
+    markers.splice(idx, 1);
+    div.remove();
+    listEl.querySelectorAll('.stop').forEach((el, i) => el.dataset.index = i);
+    updateRoute();
+  });
+}
+
+// Adiciona marcador e item na lista
 function addMarker(latlng, label) {
   const marker = L.marker(latlng, { draggable: true })
     .addTo(map)
     .bindPopup(label)
     .openPopup();
+
   marker.on('dragend', updateRoute);
   markers.push(marker);
+  addListItem(label);
   updateRoute();
 }
 
@@ -29,6 +82,7 @@ function clearMarkers() {
   if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
   if (vehicleMarker) { map.removeLayer(vehicleMarker); vehicleMarker = null; }
   if (animationInterval) { clearInterval(animationInterval); animationInterval = null; }
+  listEl.innerHTML = '';
   document.getElementById('dir-steps').innerHTML = '';
   document.getElementById('directions').classList.add('hidden');
 }
@@ -79,10 +133,14 @@ function updateRoute() {
       stepsContainer.appendChild(li);
     });
     document.getElementById('directions').classList.remove('hidden');
+
+    const latlngs = route.coordinates.map(c => [c.lat, c.lng]);
+    routeLine = L.polyline(latlngs, { color: '#2563eb', weight: 5 }).addTo(map);
+    map.fitBounds(routeLine.getBounds(), { padding: [50,50] });
   });
 }
 
-// Função para animar veículo ao longo da rota
+// Animação do veículo
 function animateVehicle(routeCoords, speed = 100) {
   if (vehicleMarker) map.removeLayer(vehicleMarker);
   if (animationInterval) clearInterval(animationInterval);
@@ -92,20 +150,15 @@ function animateVehicle(routeCoords, speed = 100) {
 
   animationInterval = setInterval(() => {
     index++;
-    if (index >= routeCoords.length) {
-      clearInterval(animationInterval);
-      animationInterval = null;
-      return;
-    }
+    if (index >= routeCoords.length) { clearInterval(animationInterval); animationInterval = null; return; }
     vehicleMarker.setLatLng(routeCoords[index]);
     map.panTo(routeCoords[index]);
   }, speed);
 }
 
-// Clique no mapa
+// Eventos
 map.on('click', e => addMarker(e.latlng, `Ponto ${markers.length + 1}`));
 
-// Adicionar endereço
 document.getElementById('add').addEventListener('click', async () => {
   const input = document.getElementById('search');
   const address = input.value.trim();
@@ -118,18 +171,12 @@ document.getElementById('add').addEventListener('click', async () => {
   } else alert('Endereço não encontrado!');
 });
 
-// Limpar
 document.getElementById('clear').addEventListener('click', clearMarkers);
-
-// Fechar painel
 document.getElementById('close-directions').addEventListener('click', () => {
   document.getElementById('directions').classList.add('hidden');
 });
-
-// Traçar rota
 document.getElementById('route').addEventListener('click', updateRoute);
 
-// Otimizar rota com OSRM Trip API e animar veículo
 document.getElementById('optimize').addEventListener('click', async () => {
   if (markers.length < 3) return;
 
@@ -144,10 +191,13 @@ document.getElementById('optimize').addEventListener('click', async () => {
     const newMarkers = order.map(i => markers[i]);
     markers.forEach(m => map.removeLayer(m));
     markers = [];
+    listEl.innerHTML = '';
+
     newMarkers.forEach((m, idx) => {
       m.addTo(map);
       m.bindPopup(`Ponto ${idx+1}`).openPopup();
       markers.push(m);
+      addListItem(m.getPopup().getContent());
     });
 
     const routeCoords = data.trips[0].geometry.coordinates.map(c => [c[1], c[0]]);
@@ -156,6 +206,6 @@ document.getElementById('optimize').addEventListener('click', async () => {
     map.fitBounds(routeLine.getBounds(), { padding: [50,50] });
 
     updateRoute();
-    animateVehicle(routeCoords, 200); // velocidade ajustável (ms por passo)
+    animateVehicle(routeCoords, 200);
   } else alert('Não foi possível otimizar a rota!');
 });
