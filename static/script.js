@@ -15,7 +15,6 @@ const listEl = document.getElementById('list');
 const sortable = Sortable.create(listEl, {
   animation: 150,
   onEnd: function() {
-    // Reordena marcadores conforme lista
     const newOrder = [];
     listEl.querySelectorAll('.stop').forEach(item => {
       const index = parseInt(item.dataset.index);
@@ -49,7 +48,6 @@ function addListItem(label) {
     markers[idx].bindPopup(inputEl.value);
   });
 
-  // Botão remover
   div.querySelector('.x').addEventListener('click', () => {
     const idx = parseInt(div.dataset.index);
     map.removeLayer(markers[idx]);
@@ -116,22 +114,29 @@ function updateRoute() {
     draggableWaypoints: false,
     fitSelectedRoutes: true,
     show: false,
-    language: 'pt' // Tradução para português
+    language: 'pt'
   }).addTo(map);
 
   routeControl.on('routesfound', function(e) {
     const route = e.routes[0];
     const summary = `${(route.summary.totalDistance/1000).toFixed(2)} km, ${(route.summary.totalTime/60).toFixed(0)} min`;
-    document.getElementById('dir-summary').innerText = summary;
 
     const stepsContainer = document.getElementById('dir-steps');
     stepsContainer.innerHTML = '';
+
+    // Exibe passos da rota
     route.instructions.forEach((step, i) => {
       const li = document.createElement('li');
       li.className = 'dir-step';
       li.innerHTML = `<div class="dir-ico">${i+1}</div><div class="dir-txt">${step.text}</div>`;
       stepsContainer.appendChild(li);
     });
+
+    // Exibe nomes personalizados dos pontos no resumo
+    const dirSummary = document.getElementById('dir-summary');
+    const waypointNames = markers.map((m, i) => listEl.children[i].querySelector('input').value);
+    dirSummary.innerText = `${summary} – ${waypointNames.join(' → ')}`;
+
     document.getElementById('directions').classList.remove('hidden');
 
     const latlngs = route.coordinates.map(c => [c.lat, c.lng]);
