@@ -15,7 +15,6 @@ const listEl = document.getElementById('list');
 const sortable = Sortable.create(listEl, {
   animation: 150,
   onEnd: function() {
-    // Reordena marcadores conforme lista
     const newOrder = [];
     listEl.querySelectorAll('.stop').forEach(item => {
       const index = parseInt(item.dataset.index);
@@ -23,7 +22,6 @@ const sortable = Sortable.create(listEl, {
     });
     markers = newOrder;
     updateRoute();
-    // Atualiza dataset e labels
     markers.forEach((m, i) => {
       m.bindPopup(listEl.children[i].querySelector('input').value);
       listEl.children[i].dataset.index = i;
@@ -50,7 +48,6 @@ function addListItem(label) {
     markers[idx].bindPopup(inputEl.value);
   });
 
-  // Botão remover
   div.querySelector('.x').addEventListener('click', () => {
     const idx = parseInt(div.dataset.index);
     map.removeLayer(markers[idx]);
@@ -116,7 +113,8 @@ function updateRoute() {
     addWaypoints: false,
     draggableWaypoints: false,
     fitSelectedRoutes: true,
-    show: false
+    show: false,
+    language: 'pt'
   }).addTo(map);
 
   routeControl.on('routesfound', function(e) {
@@ -126,12 +124,25 @@ function updateRoute() {
 
     const stepsContainer = document.getElementById('dir-steps');
     stepsContainer.innerHTML = '';
+
+    // Usar nomes personalizados dos pontos
     route.instructions.forEach((step, i) => {
       const li = document.createElement('li');
       li.className = 'dir-step';
-      li.innerHTML = `<div class="dir-ico">${i+1}</div><div class="dir-txt">${step.text}</div>`;
+      
+      // Tenta identificar o ponto correspondente
+      let pointName = '';
+      markers.forEach((m, idx) => {
+        const latlng = m.getLatLng();
+        if (Math.abs(latlng.lat - step.lat) < 0.0001 && Math.abs(latlng.lng - step.lng) < 0.0001) {
+          pointName = listEl.children[idx].querySelector('input').value;
+        }
+      });
+
+      li.innerHTML = `<div class="dir-ico">${i+1}</div><div class="dir-txt">${step.text} ${pointName ? `– ${pointName}` : ''}</div>`;
       stepsContainer.appendChild(li);
     });
+
     document.getElementById('directions').classList.remove('hidden');
 
     const latlngs = route.coordinates.map(c => [c.lat, c.lng]);
@@ -195,7 +206,7 @@ document.getElementById('optimize').addEventListener('click', async () => {
 
     newMarkers.forEach((m, idx) => {
       m.addTo(map);
-      m.bindPopup(`Ponto ${idx+1}`).openPopup();
+      m.bindPopup(listEl.children[idx]?.querySelector('input').value || `Ponto ${idx+1}`).openPopup();
       markers.push(m);
       addListItem(m.getPopup().getContent());
     });
