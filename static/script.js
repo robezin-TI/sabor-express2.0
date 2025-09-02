@@ -1,211 +1,113 @@
-// Inicializa o mapa
-const map = L.map('map').setView([-23.55052, -46.633308], 12);
+let map = L.map('map').setView([-23.5505, -46.6333], 13); // Padrão: SP
+let markers = [];
+let routingControl = null;
+
+// Mapa base
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors'
+    attribution: '© OpenStreetMap'
 }).addTo(map);
 
-let markers = [];
-let routeControl = null;
-let routeLine = null;
-let vehicleMarker = null;
-let animationInterval = null;
-
-// Inicializa Sortable para drag & drop
-const listEl = document.getElementById('list');
-const sortable = Sortable.create(listEl, {
-  animation: 150,
-  onEnd: function() {
-    // Reordena marcadores conforme lista
-    const newOrder = [];
-    listEl.querySelectorAll('.stop').forEach(item => {
-      const index = parseInt(item.dataset.index);
-      newOrder.push(markers[index]);
-    });
-    markers = newOrder;
-    updateRoute();
-    // Atualiza dataset e labels
-    markers.forEach((m, i) => {
-      m.bindPopup(listEl.children[i].querySelector('input').value);
-      listEl.children[i].dataset.index = i;
-    });
-  }
+// Adicionar marcador clicando no mapa
+map.on('click', function(e) {
+    addPointToList(e.latlng.lat, e.latlng.lng, `Ponto ${markers.length + 1}`);
 });
 
-// Adiciona item na lista lateral
-function addListItem(label) {
-  const div = document.createElement('div');
-  div.className = 'stop';
-  div.dataset.index = markers.length - 1;
+// Função para adicionar pontos
+function addPointToList(lat, lng, label) {
+    let marker = L.marker([lat, lng]).addTo(map).bindPopup(label).openPopup();
+    markers.push(marker);
 
-  div.innerHTML = `
-    <div class="handle">≡</div>
-    <input value="${label}" />
-    <button class="x">×</button>
-  `;
-  listEl.appendChild(div);
+    let li = document.createElement('li');
+    li.textContent = label;
+    li.dataset.lat = lat;
+    li.dataset.lng = lng;
 
-  const inputEl = div.querySelector('input');
-  inputEl.addEventListener('input', () => {
-    const idx = parseInt(div.dataset.index);
-    markers[idx].bindPopup(inputEl.value);
-  });
+    let removeBtn = document.createElement('button');
+    removeBtn.textContent = "X";
+    removeBtn.onclick = () => {
+        map.removeLayer(marker);
+        li.remove();
+        markers = markers.filter(m => m !== marker);
+    };
 
-  // Botão remover
-  div.querySelector('.x').addEventListener('click', () => {
-    const idx = parseInt(div.dataset.index);
-    map.removeLayer(markers[idx]);
-    markers.splice(idx, 1);
-    div.remove();
-    listEl.querySelectorAll('.stop').forEach((el, i) => el.dataset.index = i);
-    updateRoute();
-  });
+    li.appendChild(removeBtn);
+    document.getElementById("pointList").appendChild(li);
 }
 
-// Adiciona marcador e item na lista
-function addMarker(latlng, label) {
-  const marker = L.marker(latlng, { draggable: true })
-    .addTo(map)
-    .bindPopup(label)
-    .openPopup();
+// Botão adicionar
+document.getElementById("addPoint").onclick = () => {
+    let input = document.getElementById("addressInput").value;
+    if (!input) return;
 
-  marker.on('dragend', updateRoute);
-  markers.push(marker);
-  addListItem(label);
-  updateRoute();
-}
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${input}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.length > 0) {
+                let lat = data[0].lat;
+                let lon = data[0].lon;
+                addPointToList(lat, lon, input);
+                map.setView([lat, lon], 14);
+            } else {
+                alert("Endereço não encontrado!");
+            }
+        });
+};
+
+// Traçar rota
+document.getElementById("traceRoute").onclick = () => {
+    if (routingControl) {
+        map.removeControl(routingControl);
+    }
+
+    let waypoints = markers.map(m => L.latLng(m.getLatLng().lat, m.getLatLng().lng));
+
+    routingControl = L.Routing.control({
+        waypoints: waypoints,
+        routeWhileDragging: true,
+        language: "pt-BR"
+    }).addTo(map);
+};
+
+// Otimizar rota com OSRM
+document.getElementById("optimizeRoute").onclick = () => {
+    if (markers.length < 2) {
+        alert("Adicione pelo menos 2 pontos!");
+        return;
+    }
+
+    let coords = markers.map(m => [m.getLatLng().lng, m.getLatLng().lat]).join(';');
+    fetch(`https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&roundtrip=false&overview=full&geometries=geojson`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === "Ok") {
+                if (routingControl) {
+                    map.removeControl(routingControl);
+                }
+
+                let waypoints = data.trips[0].waypoints.map(wp => L.latLng(wp.location[1], wp.location[0]));
+                routingControl = L.Routing.control({
+                    waypoints: waypoints,
+                    routeWhileDragging: true,
+                    language: "pt-BR"
+                }).addTo(map);
+            }
+        });
+};
 
 // Limpar tudo
-function clearMarkers() {
-  markers.forEach(m => map.removeLayer(m));
-  markers = [];
-  if (routeControl) { map.removeControl(routeControl); routeControl = null; }
-  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
-  if (vehicleMarker) { map.removeLayer(vehicleMarker); vehicleMarker = null; }
-  if (animationInterval) { clearInterval(animationInterval); animationInterval = null; }
-  listEl.innerHTML = '';
-  document.getElementById('dir-steps').innerHTML = '';
-  document.getElementById('directions').classList.add('hidden');
-}
-
-// Geocoding via Nominatim
-async function geocode(address) {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.length > 0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-  return null;
-}
-
-// Atualiza rota e painel
-function updateRoute() {
-  if (markers.length < 2) {
-    if (routeControl) map.removeControl(routeControl);
-    if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
-    document.getElementById('directions').classList.add('hidden');
-    document.getElementById('dir-steps').innerHTML = '';
-    return;
-  }
-
-  const waypoints = markers.map(m => L.latLng(m.getLatLng()));
-  if (routeControl) map.removeControl(routeControl);
-  if (routeLine) map.removeLayer(routeLine);
-
-  routeControl = L.Routing.control({
-    waypoints,
-    lineOptions: { styles: [{ color: '#2563eb', weight: 5 }] },
-    addWaypoints: false,
-    draggableWaypoints: false,
-    fitSelectedRoutes: true,
-    show: false
-  }).addTo(map);
-
-  routeControl.on('routesfound', function(e) {
-    const route = e.routes[0];
-    const summary = `${(route.summary.totalDistance/1000).toFixed(2)} km, ${(route.summary.totalTime/60).toFixed(0)} min`;
-    document.getElementById('dir-summary').innerText = summary;
-
-    const stepsContainer = document.getElementById('dir-steps');
-    stepsContainer.innerHTML = '';
-    route.instructions.forEach((step, i) => {
-      const li = document.createElement('li');
-      li.className = 'dir-step';
-      li.innerHTML = `<div class="dir-ico">${i+1}</div><div class="dir-txt">${step.text}</div>`;
-      stepsContainer.appendChild(li);
-    });
-    document.getElementById('directions').classList.remove('hidden');
-
-    const latlngs = route.coordinates.map(c => [c.lat, c.lng]);
-    routeLine = L.polyline(latlngs, { color: '#2563eb', weight: 5 }).addTo(map);
-    map.fitBounds(routeLine.getBounds(), { padding: [50,50] });
-  });
-}
-
-// Animação do veículo
-function animateVehicle(routeCoords, speed = 100) {
-  if (vehicleMarker) map.removeLayer(vehicleMarker);
-  if (animationInterval) clearInterval(animationInterval);
-
-  let index = 0;
-  vehicleMarker = L.marker(routeCoords[0], { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', iconSize: [32,32] }) }).addTo(map);
-
-  animationInterval = setInterval(() => {
-    index++;
-    if (index >= routeCoords.length) { clearInterval(animationInterval); animationInterval = null; return; }
-    vehicleMarker.setLatLng(routeCoords[index]);
-    map.panTo(routeCoords[index]);
-  }, speed);
-}
-
-// Eventos
-map.on('click', e => addMarker(e.latlng, `Ponto ${markers.length + 1}`));
-
-document.getElementById('add').addEventListener('click', async () => {
-  const input = document.getElementById('search');
-  const address = input.value.trim();
-  if (!address) return;
-  const latlng = await geocode(address);
-  if (latlng) {
-    addMarker(latlng, address);
-    map.setView(latlng, 14);
-    input.value = '';
-  } else alert('Endereço não encontrado!');
-});
-
-document.getElementById('clear').addEventListener('click', clearMarkers);
-document.getElementById('close-directions').addEventListener('click', () => {
-  document.getElementById('directions').classList.add('hidden');
-});
-document.getElementById('route').addEventListener('click', updateRoute);
-
-document.getElementById('optimize').addEventListener('click', async () => {
-  if (markers.length < 3) return;
-
-  const coords = markers.map(m => `${m.getLatLng().lng},${m.getLatLng().lat}`).join(';');
-  const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&roundtrip=false&overview=full&geometries=geojson`;
-
-  const res = await fetch(url);
-  const data = await res.json();
-
-  if (data.code === 'Ok') {
-    const order = data.trips[0].waypoint_order;
-    const newMarkers = order.map(i => markers[i]);
+document.getElementById("clearAll").onclick = () => {
     markers.forEach(m => map.removeLayer(m));
     markers = [];
-    listEl.innerHTML = '';
+    document.getElementById("pointList").innerHTML = "";
+    if (routingControl) {
+        map.removeControl(routingControl);
+    }
+};
 
-    newMarkers.forEach((m, idx) => {
-      m.addTo(map);
-      m.bindPopup(`Ponto ${idx+1}`).openPopup();
-      markers.push(m);
-      addListItem(m.getPopup().getContent());
-    });
-
-    const routeCoords = data.trips[0].geometry.coordinates.map(c => [c[1], c[0]]);
-    if (routeLine) map.removeLayer(routeLine);
-    routeLine = L.polyline(routeCoords, { color: '#2563eb', weight: 5 }).addTo(map);
-    map.fitBounds(routeLine.getBounds(), { padding: [50,50] });
-
-    updateRoute();
-    animateVehicle(routeCoords, 200);
-  } else alert('Não foi possível otimizar a rota!');
+// Drag-and-drop lista
+new Sortable(document.getElementById("pointList"), {
+    animation: 150,
+    onEnd: () => {
+        console.log("Ordem alterada!");
+    }
 });
