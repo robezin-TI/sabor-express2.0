@@ -1,64 +1,49 @@
-<!doctype html>
-<html lang="pt-br">
+<!DOCTYPE html>
+<html lang="pt-BR">
 <head>
-  <meta charset="utf-8" />
-  <title>Sabor Express – Otimizador de Rotas</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sabor Express</title>
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css">
 
-  <!-- Leaflet Routing Machine (usamos só como engine; painel é nosso) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
-  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <!-- SortableJS (drag & drop) -->
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <!-- Leaflet Routing Machine -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css">
+    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
-  <link rel="stylesheet" href="./style.css" />
+    <!-- K-Means clustering -->
+    <script src="https://cdn.jsdelivr.net/npm/ml-kmeans@4.0.3/dist/ml-kmeans.min.js"></script>
+
+    <!-- Sortable (drag-and-drop) -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
-  <div class="app">
-    <aside class="sidebar">
-      <h1>Sabor Express</h1>
+    <div id="app">
+        <div id="sidebar">
+            <h2>Sabor Express</h2>
+            <input id="addressInput" type="text" placeholder="Digite um endereço (ou clique no mapa)">
+            <button id="addPoint">Adicionar</button>
 
-      <div class="input-row">
-        <input id="search" placeholder="Digite um endereço (ou clique no mapa)" />
-        <button id="add" class="btn gray">Adicionar</button>
-      </div>
-      <div class="hint">Dica: você pode clicar no mapa para adicionar um ponto.</div>
+            <ul id="pointList"></ul>
 
-      <div id="list" class="list"></div>
+            <div class="buttons">
+                <button id="optimizeRoute">Otimizar rota (OSRM)</button>
+                <button id="traceRoute">Traçar rota</button>
+                <button id="clearAll">Limpar tudo</button>
+            </div>
 
-      <div class="actions">
-        <div class="row">
-          <button id="optimize" class="btn primary">Otimizar rota (OSRM)</button>
-          <button id="route" class="btn gray">Traçar rota</button>
+            <p class="note">Dica: você pode clicar no mapa para adicionar um ponto.</p>
+            <p class="note">Geocodificação: Nominatim (OSM). Roteamento: OSRM.</p>
         </div>
-        <button id="clear" class="btn danger">Limpar tudo</button>
-      </div>
-
-      <div class="footer muted">
-        <p>Arraste os itens para reordenar (A, B, C… atualizam automaticamente).</p>
-        <p>Geocodificação: Nominatim (OSM). Roteamento: OSRM.</p>
-      </div>
-    </aside>
-
-    <div id="map"></div>
-
-    <div id="directions" class="directions hidden">
-      <div class="dir-header">
-        <div>
-          <div class="dir-title">Resumo da rota</div>
-          <div id="dir-summary" class="dir-summary">—</div>
-        </div>
-        <button id="close-directions" title="Fechar">×</button>
-      </div>
-      <ol id="dir-steps" class="dir-steps"></ol>
+        <div id="map"></div>
     </div>
-  </div>
 
-  <script src="./script.js"></script>
+    <!-- Script principal -->
+    <script src="script.js"></script>
 </body>
 </html>
