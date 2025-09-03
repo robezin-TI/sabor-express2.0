@@ -19,6 +19,7 @@
             background-color: #f5f5f5;
             color: #333;
             line-height: 1.6;
+            overflow: hidden;
         }
         
         #sidebar {
@@ -46,7 +47,7 @@
             margin-bottom: 20px;
         }
         
-        input[type="text"] {
+        input[type="text"], input[type="number"] {
             width: 100%;
             padding: 12px;
             border: 1px solid #ddd;
@@ -190,6 +191,40 @@
             align-items: center;
             justify-content: center;
         }
+        
+        /* Estilos para o painel de rotas */
+        .leaflet-routing-container {
+            background-color: white;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            width: 300px;
+            margin-top: 60px;
+            margin-right: 10px;
+        }
+        
+        .leaflet-control-container .leaflet-top {
+            z-index: 999;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .error-message {
+            display: none;
+            color: #e74c3c;
+            padding: 10px;
+            background-color: #fadbd8;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -218,6 +253,9 @@
             <button class="red" onclick="limparTudo()">Limpar Tudo</button>
         </div>
         
+        <div class="loading" id="loading">Processando, aguarde...</div>
+        <div class="error-message" id="error-message"></div>
+        
         <div class="cluster-info">
             <strong>Como funciona:</strong> O algoritmo K-means agrupa os pontos de entrega por proximidade geográfica, facilitando o roteamento e reduzindo distâncias percorridas.
         </div>
@@ -231,6 +269,7 @@
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     
     <!-- Leaflet Routing Machine -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     
     <script>
@@ -245,6 +284,7 @@
         let marcadores = [];
         let clusters = [];
         let controleRota = null;
+        let routingControl = null;
         
         // Clique no mapa para adicionar ponto
         map.on('click', function(e) {
@@ -256,9 +296,12 @@
             let input = document.getElementById('endereco').value;
             if (!input) return alert('Por favor, digite um endereço');
             
+            showLoading(true);
+            
             fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&limit=1`)
                 .then(res => res.json())
                 .then(data => {
+                    showLoading(false);
                     if (data.length > 0) {
                         let lat = parseFloat(data[0].lat);
                         let lon = parseFloat(data[0].lon);
@@ -269,8 +312,9 @@
                     }
                 })
                 .catch(err => {
+                    showLoading(false);
                     console.error('Erro na geocodificação:', err);
-                    alert('Erro ao buscar endereço. Tente novamente.');
+                    showError('Erro ao buscar endereço. Tente novamente.');
                 });
         }
         
@@ -319,9 +363,9 @@
             });
             
             // Remover rota
-            if (controleRota) {
-                map.removeControl(controleRota);
-                controleRota = null;
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
             }
             
             // Reiniciar arrays
@@ -330,6 +374,24 @@
             clusters = [];
             
             atualizarLista();
+            hideError();
+        }
+        
+        // Mostrar/ocultar loading
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+        
+        // Mostrar mensagem de erro
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+        
+        // Ocultar mensagem de erro
+        function hideError() {
+            document.getElementById('error-message').style.display = 'none';
         }
         
         // Implementação do algoritmo K-means
@@ -514,23 +576,30 @@
             }
             
             // Remover rota anterior se existir
-            if (controleRota) {
-                map.removeControl(controleRota);
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
             }
             
             // Criar waypoints para a rota
             let waypoints = pontos.map(p => L.latLng(p[0], p[1]));
             
-            // Adicionar controle de rota
-            controleRota = L.Routing.control({
+            // Adicionar controle de rota com posicionamento correto
+            routingControl = L.Routing.control({
                 waypoints: waypoints,
                 routeWhileDragging: false,
                 showAlternatives: false,
                 lineOptions: {
                     styles: [{color: '#3498db', opacity: 0.7, weight: 5}]
                 },
-                createMarker: function() { return null; } // Não criar marcadores extras
+                createMarker: function() { return null; }, // Não criar marcadores extras
+                fitSelectedRoutes: true,
+                show: true,
+                collapsible: true
             }).addTo(map);
+            
+            // Reposicionar o container de rotas para não cobrir a sidebar
+            document.querySelector('.leaflet-routing-container').style.marginLeft = '350px';
         }
         
         // Otimizar rota usando OSRM
@@ -540,39 +609,69 @@
                 return;
             }
             
+            showLoading(true);
+            hideError();
+            
             // Formatar coordenadas para a API OSRM
             let coords = pontos.map(p => `${p[1]},${p[0]}`).join(';');
             
-            fetch(`https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&roundtrip=false&annotations=true&geometries=geojson`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.code === 'Ok') {
-                        // Reordenar pontos conforme a otimização
-                        let novaOrdem = data.trips[0].waypoints.map(w => [w.location[1], w.location[0]]);
-                        
-                        // Atualizar pontos e marcadores
-                        pontos = novaOrdem;
-                        marcadores.forEach(m => map.removeLayer(m));
-                        marcadores = [];
-                        
-                        pontos.forEach((p, i) => {
-                            let marker = L.marker([p[0], p[1]])
-                                .addTo(map)
-                                .bindPopup(`Ponto ${i+1}`);
-                            marcadores.push(marker);
-                        });
-                        
-                        atualizarLista();
-                        tracarRota();
-                        alert('Rota otimizada com sucesso!');
-                    } else {
-                        alert('Erro ao otimizar a rota: ' + data.code);
-                    }
-                })
-                .catch(err => {
-                    console.error('Erro na otimização da rota:', err);
-                    alert('Erro ao conectar com o servidor de roteamento');
-                });
+            // Tentar diferentes servidores OSRM
+            const servers = [
+                'https://router.project-osrm.org',
+                'https://osrm.saas.work',
+                'https://routing.openstreetmap.de'
+            ];
+            
+            let currentServer = 0;
+            
+            function tryNextServer() {
+                if (currentServer >= servers.length) {
+                    showLoading(false);
+                    showError('Todos os servidores de roteamento estão indisponíveis. Tente novamente mais tarde.');
+                    return;
+                }
+                
+                let server = servers[currentServer];
+                currentServer++;
+                
+                fetch(`${server}/trip/v1/driving/${coords}?source=first&roundtrip=false&annotations=true&geometries=geojson`)
+                    .then(res => {
+                        if (!res.ok) throw new Error(`Servidor respondeu com status ${res.status}`);
+                        return res.json();
+                    })
+                    .then(data => {
+                        showLoading(false);
+                        if (data.code === 'Ok') {
+                            // Reordenar pontos conforme a otimização
+                            let novaOrdem = data.trips[0].waypoints.map(w => [w.location[1], w.location[0]]);
+                            
+                            // Atualizar pontos e marcadores
+                            pontos = novaOrdem;
+                            marcadores.forEach(m => map.removeLayer(m));
+                            marcadores = [];
+                            
+                            pontos.forEach((p, i) => {
+                                let marker = L.marker([p[0], p[1]])
+                                    .addTo(map)
+                                    .bindPopup(`Ponto ${i+1}`);
+                                marcadores.push(marker);
+                            });
+                            
+                            atualizarLista();
+                            tracarRota();
+                            alert('Rota otimizada com sucesso!');
+                        } else {
+                            showError('Erro ao otimizar a rota: ' + data.code);
+                        }
+                    })
+                    .catch(err => {
+                        console.error(`Erro no servidor ${server}:`, err);
+                        tryNextServer();
+                    });
+            }
+            
+            // Iniciar tentativas com os servidores
+            tryNextServer();
         }
     </script>
 </body>
