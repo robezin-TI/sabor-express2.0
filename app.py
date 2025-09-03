@@ -4,17 +4,19 @@ import requests
 import os
 
 app = Flask(__name__)
-CORS(app)  # Permitir requisições de diferentes origens
+CORS(app)
 
-# Servir a página principal
+# Obter o diretório atual do script
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 @app.route('/')
 def serve_index():
-    return send_from_directory('.', 'index.html')
+    return send_from_directory(BASE_DIR, 'index.html')
 
-# Servir arquivos estáticos (CSS, JS, etc)
-@app.route('/<path:path>')
-def serve_static(path):
-    return send_from_directory('.', path)
+@app.route('/static/<path:path>')
+def serve_static_files(path):
+    """Serve arquivos estáticos da pasta static/"""
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), path)
 
 # API para geocodificação
 @app.route('/api/geocode', methods=['GET'])
@@ -88,5 +90,11 @@ def optimize_route():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    # Verificar se index.html existe
+    index_path = os.path.join(BASE_DIR, 'index.html')
+    if not os.path.exists(index_path):
+        print("⚠️  AVISO: index.html não encontrado no diretório principal!")
+        print("📁 Movendo index.html para fora da pasta static...")
+    
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
