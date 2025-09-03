@@ -363,31 +363,44 @@
             adicionarPonto(e.latlng.lat, e.latlng.lng, `Ponto ${pontos.length + 1}`);
         });
         
-        // Adiciona ponto através do endereço digitado
-        function adicionarEndereco() {
+        // Função para fazer requisições à API
+        async function fetchAPI(endpoint, options = {}) {
+            try {
+                const response = await fetch(`/api/${endpoint}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Erro na requisição API:', error);
+                throw error;
+            }
+        }
+
+        // Adiciona ponto através do endereço digitado (USA API FLASK)
+        async function adicionarEndereco() {
             let input = document.getElementById('endereco').value;
             if (!input) return alert('Por favor, digite um endereço');
             
             showLoading(true);
             
-            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&limit=1`)
-                .then(res => res.json())
-                .then(data => {
-                    showLoading(false);
-                    if (data.length > 0) {
-                        let lat = parseFloat(data[0].lat);
-                        let lon = parseFloat(data[0].lon);
-                        adicionarPonto(lat, lon, input);
-                        document.getElementById('endereco').value = '';
-                    } else {
-                        alert('Endereço não encontrado. Tente ser mais específico.');
-                    }
-                })
-                .catch(err => {
-                    showLoading(false);
-                    console.error('Erro na geocodificação:', err);
-                    showError('Erro ao buscar endereço. Tente novamente.');
-                });
+            try {
+                const data = await fetchAPI(`geocode?address=${encodeURIComponent(input)}`);
+                adicionarPonto(data.lat, data.lon, data.name || input);
+                document.getElementById('endereco').value = '';
+            } catch (error) {
+                alert('Erro ao buscar endereço. Tente novamente.');
+            } finally {
+                showLoading(false);
+            }
         }
         
         // Função para adicionar ponto ao mapa
@@ -548,7 +561,7 @@
             let centroids = [];
             let usedIndexes = [];
             
-            for (let i = 0; i < k; i) {
+            for (let i = 0; i < k; i++) {
                 let randomIndex;
                 do {
                     randomIndex = Math.floor(Math.random() * points.length);
@@ -792,8 +805,8 @@
             alert(`Rotas traçadas para ${numClusters} clusters!`);
         }
         
-        // Otimizar rota usando OSRM
-        function otimizarRota() {
+        // Otimizar rota usando API Flask
+        async function otimizarRota() {
             if (pontos.length < 2) {
                 alert('Adicione pelo menos 2 pontos para otimizar a rota');
                 return;
@@ -802,66 +815,35 @@
             showLoading(true);
             hideError();
             
-            // Formatar coordenadas para a API OSRM
-            let coords = pontos.map(p => `${p[1]},${p[0]}`).join(';');
-            
-            // Tentar diferentes servidores OSRM
-            const servers = [
-                'https://router.project-osrm.org',
-                'https://osrm.saas.work',
-                'https://routing.openstreetmap.de'
-            ];
-            
-            let currentServer = 0;
-            
-            function tryNextServer() {
-                if (currentServer >= servers.length) {
-                    showLoading(false);
-                    showError('Todos os servidores de roteamento estão indisponíveis. Tente novamente mais tarde.');
-                    return;
-                }
+            try {
+                const pointsForAPI = pontos.map(p => ({ lat: p[0], lon: p[1] }));
                 
-                let server = servers[currentServer];
-                currentServer++;
+                const data = await fetchAPI('optimize-route', {
+                    method: 'POST',
+                    body: JSON.stringify({ points: pointsForAPI })
+                });
                 
-                fetch(`${server}/trip/v1/driving/${coords}?source=first&roundtrip=false&annotations=true&geometries=geojson`)
-                    .then(res => {
-                        if (!res.ok) throw new Error(`Servidor respondeu com status ${res.status}`);
-                        return res.json();
-                    })
-                    .then(data => {
-                        showLoading(false);
-                        if (data.code === 'Ok') {
-                            // Reordenar pontos conforme a otimização
-                            let novaOrdem = data.trips[0].waypoints.map(w => [w.location[1], w.location[0]]);
-                            
-                            // Atualizar pontos e marcadores
-                            pontos = novaOrdem;
-                            marcadores.forEach(m => map.removeLayer(m));
-                            marcadores = [];
-                            
-                            pontos.forEach((p, i) => {
-                                let marker = L.marker([p[0], p[1]])
-                                    .addTo(map)
-                                    .bindPopup(`Ponto ${i+1}`);
-                                marcadores.push(marker);
-                            });
-                            
-                            atualizarLista();
-                            tracarRota();
-                            alert('Rota otimizada com sucesso!');
-                        } else {
-                            showError('Erro ao otimizar a rota: ' + data.code);
-                        }
-                    })
-                    .catch(err => {
-                        console.error(`Erro no servidor ${server}:`, err);
-                        tryNextServer();
-                    });
+                // Atualizar pontos com a rota otimizada
+                pontos = data.optimized_route;
+                marcadores.forEach(m => map.removeLayer(m));
+                marcadores = [];
+                
+                pontos.forEach((p, i) => {
+                    let marker = L.marker([p[0], p[1]])
+                        .addTo(map)
+                        .bindPopup(`Ponto ${i+1}`);
+                    marcadores.push(marker);
+                });
+                
+                atualizarLista();
+                tracarRota();
+                alert('Rota otimizada com sucesso!');
+                
+            } catch (error) {
+                showError('Erro ao otimizar a rota. Tente novamente.');
+            } finally {
+                showLoading(false);
             }
-            
-            // Iniciar tentativas com os servidores
-            tryNextServer();
         }
         
         // Inicializar quando o documento estiver pronto
