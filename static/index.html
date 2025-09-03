@@ -401,7 +401,6 @@
                 
             marcadores.push(marker);
             atualizarLista();
-            initDragAndDrop();
         }
         
         // Atualiza a lista de pontos na sidebar
@@ -423,30 +422,19 @@
                     <button onclick="removerPonto(${i})" class="red">X</button>
                 `;
                 
+                // Adicionar event listeners para drag and drop
+                li.addEventListener('dragstart', handleDragStart);
+                li.addEventListener('dragover', handleDragOver);
+                li.addEventListener('dragenter', handleDragEnter);
+                li.addEventListener('dragleave', handleDragLeave);
+                li.addEventListener('drop', handleDrop);
+                li.addEventListener('dragend', handleDragEnd);
+                
                 lista.appendChild(li);
             });
-            
-            // Reinicializar eventos de drag and drop
-            initDragAndDrop();
         }
         
-        // Inicializar funcionalidade de drag and drop
-        function initDragAndDrop() {
-            const lista = document.getElementById('lista-pontos');
-            const items = lista.querySelectorAll('li');
-            
-            // Remover event listeners anteriores para evitar duplicação
-            items.forEach(item => {
-                item.addEventListener('dragstart', handleDragStart);
-                item.addEventListener('dragover', handleDragOver);
-                item.addEventListener('dragenter', handleDragEnter);
-                item.addEventListener('dragleave', handleDragLeave);
-                item.addEventListener('drop', handleDrop);
-                item.addEventListener('dragend', handleDragEnd);
-            });
-        }
-        
-        // Manipuladores de eventos para drag and drop
+        // Manipuladores de eventos para drag and drop - NOVA IMPLEMENTAÇÃO
         function handleDragStart(e) {
             this.classList.add('dragging');
             dragSrcEl = this;
@@ -461,7 +449,7 @@
         
         function handleDragOver(e) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
+            return false;
         }
         
         function handleDragLeave(e) {
@@ -909,9 +897,9 @@
             tryNextServer();
         }
         
-        // Inicializar drag and drop quando o documento estiver pronto
+        // Inicializar quando o documento estiver pronto
         document.addEventListener('DOMContentLoaded', function() {
-            initDragAndDrop();
+            // Nada adicional necessário aqui - os event listeners são adicionados em atualizarLista()
         });
     </script>
 </body>
