@@ -160,6 +160,11 @@
             opacity: 0.8;
         }
         
+        #lista-pontos li.drag-over {
+            background-color: #fff3e0;
+            border: 2px dashed #ff9800;
+        }
+        
         .drag-handle {
             cursor: grab;
             margin-right: 10px;
@@ -420,32 +425,25 @@
                 
                 lista.appendChild(li);
             });
+            
+            // Reinicializar eventos de drag and drop
+            initDragAndDrop();
         }
         
         // Inicializar funcionalidade de drag and drop
         function initDragAndDrop() {
             const lista = document.getElementById('lista-pontos');
-            const items = lista.getElementsByTagName('li');
+            const items = lista.querySelectorAll('li');
             
             // Remover event listeners anteriores para evitar duplicação
-            for (let item of items) {
-                item.ondragstart = null;
-                item.ondragenter = null;
-                item.ondragover = null;
-                item.ondragleave = null;
-                item.ondrop = null;
-                item.ondragend = null;
-            }
-            
-            // Adicionar event listeners
-            for (let item of items) {
-                item.ondragstart = handleDragStart;
-                item.ondragenter = handleDragEnter;
-                item.ondragover = handleDragOver;
-                item.ondragleave = handleDragLeave;
-                item.ondrop = handleDrop;
-                item.ondragend = handleDragEnd;
-            }
+            items.forEach(item => {
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragover', handleDragOver);
+                item.addEventListener('dragenter', handleDragEnter);
+                item.addEventListener('dragleave', handleDragLeave);
+                item.addEventListener('drop', handleDrop);
+                item.addEventListener('dragend', handleDragEnd);
+            });
         }
         
         // Manipuladores de eventos para drag and drop
@@ -457,13 +455,13 @@
         }
         
         function handleDragEnter(e) {
+            e.preventDefault();
             this.classList.add('drag-over');
         }
         
         function handleDragOver(e) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            return false;
         }
         
         function handleDragLeave(e) {
@@ -471,8 +469,7 @@
         }
         
         function handleDragEnd(e) {
-            const items = document.querySelectorAll('#lista-pontos li');
-            items.forEach(item => {
+            document.querySelectorAll('#lista-pontos li').forEach(item => {
                 item.classList.remove('drag-over');
                 item.classList.remove('dragging');
             });
@@ -491,7 +488,6 @@
                 
                 // Atualizar a lista
                 atualizarLista();
-                initDragAndDrop();
                 
                 // Se já existir rota, atualizar
                 if (routingControls.length > 0) {
@@ -534,7 +530,6 @@
                 clusterAssignments.splice(index, 1);
             }
             atualizarLista();
-            initDragAndDrop();
             limparRotas();
         }
         
@@ -898,7 +893,6 @@
                             });
                             
                             atualizarLista();
-                            initDragAndDrop();
                             tracarRota();
                             alert('Rota otimizada com sucesso!');
                         } else {
