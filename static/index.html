@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sabor Express - Clusterização de Entregas</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <!-- Sortable.js para drag and drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -154,15 +156,13 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         
-        #lista-pontos li.dragging {
+        #lista-pontos li.sortable-chosen {
             background-color: #e3f2fd;
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            opacity: 0.8;
         }
         
-        #lista-pontos li.drag-over {
-            background-color: #fff3e0;
-            border: 2px dashed #ff9800;
+        #lista-pontos li.sortable-ghost {
+            opacity: 0.5;
         }
         
         .drag-handle {
@@ -356,7 +356,7 @@
         let clusters = [];
         let clusterAssignments = [];
         let routingControls = [];
-        let dragSrcEl = null;
+        let sortable = null;
         
         // Clique no mapa para adicionar ponto
         map.on('click', function(e) {
@@ -411,7 +411,6 @@
             pontos.forEach((p, i) => {
                 let li = document.createElement('li');
                 li.setAttribute('data-index', i);
-                li.draggable = true;
                 
                 li.innerHTML = `
                     <div>
@@ -422,90 +421,58 @@
                     <button onclick="removerPonto(${i})" class="red">X</button>
                 `;
                 
-                // Adicionar event listeners para drag and drop
-                li.addEventListener('dragstart', handleDragStart);
-                li.addEventListener('dragover', handleDragOver);
-                li.addEventListener('dragenter', handleDragEnter);
-                li.addEventListener('dragleave', handleDragLeave);
-                li.addEventListener('drop', handleDrop);
-                li.addEventListener('dragend', handleDragEnd);
-                
                 lista.appendChild(li);
             });
-        }
-        
-        // Manipuladores de eventos para drag and drop - NOVA IMPLEMENTAÇÃO
-        function handleDragStart(e) {
-            this.classList.add('dragging');
-            dragSrcEl = this;
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', this.getAttribute('data-index'));
-        }
-        
-        function handleDragEnter(e) {
-            e.preventDefault();
-            this.classList.add('drag-over');
-        }
-        
-        function handleDragOver(e) {
-            e.preventDefault();
-            return false;
-        }
-        
-        function handleDragLeave(e) {
-            this.classList.remove('drag-over');
-        }
-        
-        function handleDragEnd(e) {
-            document.querySelectorAll('#lista-pontos li').forEach(item => {
-                item.classList.remove('drag-over');
-                item.classList.remove('dragging');
-            });
-        }
-        
-        function handleDrop(e) {
-            e.stopPropagation();
-            e.preventDefault();
             
-            if (dragSrcEl !== this) {
-                const fromIndex = parseInt(dragSrcEl.getAttribute('data-index'));
-                const toIndex = parseInt(this.getAttribute('data-index'));
-                
-                // Reordenar arrays
-                reordenarPontos(fromIndex, toIndex);
-                
-                // Atualizar a lista
-                atualizarLista();
-                
-                // Se já existir rota, atualizar
-                if (routingControls.length > 0) {
-                    tracarRota();
+            // Inicializar ou reinicializar Sortable
+            initSortable();
+        }
+        
+        // Inicializar Sortable.js para drag and drop
+        function initSortable() {
+            if (sortable) {
+                sortable.destroy();
+            }
+            
+            sortable = new Sortable(document.getElementById('lista-pontos'), {
+                animation: 150,
+                handle: '.drag-handle',
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                onEnd: function(evt) {
+                    // Reordenar arrays com base na nova posição
+                    const oldIndex = evt.oldIndex;
+                    const newIndex = evt.newIndex;
+                    
+                    if (oldIndex !== newIndex) {
+                        // Mover item no array de pontos
+                        const pontoMovido = pontos.splice(oldIndex, 1)[0];
+                        pontos.splice(newIndex, 0, pontoMovido);
+                        
+                        // Mover item no array de marcadores
+                        const marcadorMovido = marcadores.splice(oldIndex, 1)[0];
+                        marcadores.splice(newIndex, 0, marcadorMovido);
+                        
+                        // Mover item no array de assignments de cluster se existir
+                        if (clusterAssignments.length > 0) {
+                            const assignmentMovido = clusterAssignments.splice(oldIndex, 1)[0];
+                            clusterAssignments.splice(newIndex, 0, assignmentMovido);
+                        }
+                        
+                        // Atualizar popups com novos números
+                        marcadores.forEach((marker, i) => {
+                            marker.setPopupContent(`Ponto ${i+1}`);
+                        });
+                        
+                        // Atualizar a lista para mostrar os novos números
+                        atualizarLista();
+                        
+                        // Se já existir rota, atualizar
+                        if (routingControls.length > 0) {
+                            tracarRota();
+                        }
+                    }
                 }
-            }
-            
-            this.classList.remove('drag-over');
-            return false;
-        }
-        
-        // Reordenar pontos e marcadores
-        function reordenarPontos(fromIndex, toIndex) {
-            // Mover item no array de pontos
-            const pontoMovido = pontos.splice(fromIndex, 1)[0];
-            pontos.splice(toIndex, 0, pontoMovido);
-            
-            // Mover item no array de marcadores
-            const marcadorMovido = marcadores.splice(fromIndex, 1)[0];
-            marcadores.splice(toIndex, 0, marcadorMovido);
-            
-            // Mover item no array de assignments de cluster se existir
-            if (clusterAssignments.length > 0) {
-                const assignmentMovido = clusterAssignments.splice(fromIndex, 1)[0];
-                clusterAssignments.splice(toIndex, 0, assignmentMovido);
-            }
-            
-            // Atualizar popups com novos números
-            marcadores.forEach((marker, i) => {
-                marker.setPopupContent(`Ponto ${i+1}`);
             });
         }
         
@@ -581,7 +548,7 @@
             let centroids = [];
             let usedIndexes = [];
             
-            for (let i = 0; i < k; i++) {
+            for (let i = 0; i < k; i) {
                 let randomIndex;
                 do {
                     randomIndex = Math.floor(Math.random() * points.length);
@@ -899,7 +866,8 @@
         
         // Inicializar quando o documento estiver pronto
         document.addEventListener('DOMContentLoaded', function() {
-            // Nada adicional necessário aqui - os event listeners são adicionados em atualizarLista()
+            // Inicializar Sortable.js
+            initSortable();
         });
     </script>
 </body>
