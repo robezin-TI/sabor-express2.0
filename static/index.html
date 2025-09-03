@@ -1,42 +1,579 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sabor Express - Otimizador de Rotas</title>
-  <link rel="stylesheet" href="style.css">
-
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-  <!-- Leaflet Routing Machine -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
-  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
-
-  <!-- K-Means -->
-  <script src="https://cdn.jsdelivr.net/npm/ml-kmeans@3.0.0/dist/ml-kmeans.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sabor Express - Clusterização de Entregas</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        #sidebar {
+            width: 350px;
+            background: white;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+        
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        button {
+            padding: 12px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin-right: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .add-btn {
+            background-color: #3498db;
+            color: white;
+            width: 100%;
+        }
+        
+        .add-btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .blue {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .blue:hover {
+            background-color: #2980b9;
+        }
+        
+        .green {
+            background-color: #2ecc71;
+            color: white;
+        }
+        
+        .green:hover {
+            background-color: #27ae60;
+        }
+        
+        .red {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        .red:hover {
+            background-color: #c0392b;
+        }
+        
+        .purple {
+            background-color: #9b59b6;
+            color: white;
+        }
+        
+        .purple:hover {
+            background-color: #8e44ad;
+        }
+        
+        .gray {
+            background-color: #95a5a6;
+            color: white;
+        }
+        
+        .gray:hover {
+            background-color: #7f8c8d;
+        }
+        
+        #lista-pontos {
+            list-style-type: none;
+            margin: 20px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        
+        #lista-pontos li {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        #lista-pontos li:last-child {
+            border-bottom: none;
+        }
+        
+        .cluster-controls {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        .cluster-controls h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .cluster-info {
+            background-color: #e8f4fc;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        
+        .info {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .buttons button {
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        .cluster-marker {
+            border-radius: 50%;
+            text-align: center;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
 </head>
 <body>
-  <div id="sidebar">
-    <h2>Sabor Express</h2>
-    <input type="text" id="endereco" placeholder="Digite um endereço (ou clique no mapa)">
-    <button class="add-btn" onclick="adicionarEndereco()">Adicionar</button>
-
-    <ul id="lista-pontos"></ul>
-
-    <div class="buttons">
-      <button class="blue" onclick="otimizarRota()">Otimizar rota (OSRM)</button>
-      <button class="gray" onclick="tracarRota()">Traçar rota</button>
-      <button class="green" onclick="agruparKMeans()">Agrupar K-Means</button>
-      <button class="red" onclick="limparTudo()">Limpar tudo</button>
+    <div id="sidebar">
+        <h2>Sabor Express</h2>
+        
+        <div class="input-group">
+            <input type="text" id="endereco" placeholder="Digite um endereço (ou clique no mapa)">
+            <button class="add-btn" onclick="adicionarEndereco()">Adicionar Ponto</button>
+        </div>
+        
+        <h3>Pontos de Entrega</h3>
+        <ul id="lista-pontos"></ul>
+        
+        <div class="cluster-controls">
+            <h3>Clusterização K-means</h3>
+            <div class="input-group">
+                <input type="number" id="numClusters" placeholder="Nº de clusters" min="2" max="10" value="3">
+                <button class="purple" onclick="agruparKMeans()">Agrupar Entregas</button>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button class="blue" onclick="otimizarRota()">Otimizar Rota</button>
+            <button class="green" onclick="tracarRota()">Traçar Rota</button>
+            <button class="red" onclick="limparTudo()">Limpar Tudo</button>
+        </div>
+        
+        <div class="cluster-info">
+            <strong>Como funciona:</strong> O algoritmo K-means agrupa os pontos de entrega por proximidade geográfica, facilitando o roteamento e reduzindo distâncias percorridas.
+        </div>
+        
+        <p class="info">Geocodificação: Nominatim (OSM). Roteamento: OSRM.</p>
     </div>
 
-    <p class="info">Geocodificação: Nominatim (OSM). Roteamento: OSRM.</p>
-  </div>
+    <div id="map"></div>
 
-  <div id="map"></div>
-
-  <script src="script.js"></script>
+    <!-- Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    
+    <!-- Leaflet Routing Machine -->
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    
+    <script>
+        // Inicialização do mapa
+        let map = L.map('map').setView([-23.533773, -46.625290], 12); // Posição inicial: São Paulo
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Variáveis globais
+        let pontos = [];
+        let marcadores = [];
+        let clusters = [];
+        let controleRota = null;
+        
+        // Clique no mapa para adicionar ponto
+        map.on('click', function(e) {
+            adicionarPonto(e.latlng.lat, e.latlng.lng, `Ponto ${pontos.length + 1}`);
+        });
+        
+        // Adiciona ponto através do endereço digitado
+        function adicionarEndereco() {
+            let input = document.getElementById('endereco').value;
+            if (!input) return alert('Por favor, digite um endereço');
+            
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&limit=1`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        let lat = parseFloat(data[0].lat);
+                        let lon = parseFloat(data[0].lon);
+                        adicionarPonto(lat, lon, input);
+                        document.getElementById('endereco').value = '';
+                    } else {
+                        alert('Endereço não encontrado. Tente ser mais específico.');
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro na geocodificação:', err);
+                    alert('Erro ao buscar endereço. Tente novamente.');
+                });
+        }
+        
+        // Função para adicionar ponto ao mapa
+        function adicionarPonto(lat, lon, nome) {
+            pontos.push([lat, lon]);
+            
+            // Adicionar marcador
+            let marker = L.marker([lat, lon])
+                .addTo(map)
+                .bindPopup(nome);
+                
+            marcadores.push(marker);
+            atualizarLista();
+        }
+        
+        // Atualiza a lista de pontos na sidebar
+        function atualizarLista() {
+            let lista = document.getElementById('lista-pontos');
+            lista.innerHTML = '';
+            
+            pontos.forEach((p, i) => {
+                let li = document.createElement('li');
+                li.innerHTML = `Ponto ${i+1} <button onclick="removerPonto(${i})" class="red">X</button>`;
+                lista.appendChild(li);
+            });
+        }
+        
+        // Remove um ponto específico
+        function removerPonto(index) {
+            map.removeLayer(marcadores[index]);
+            pontos.splice(index, 1);
+            marcadores.splice(index, 1);
+            atualizarLista();
+        }
+        
+        // Limpa todos os pontos e rotas
+        function limparTudo() {
+            // Remover marcadores
+            marcadores.forEach(marker => map.removeLayer(marker));
+            
+            // Remover clusters
+            clusters.forEach(cluster => {
+                if (cluster.marker) map.removeLayer(cluster.marker);
+                if (cluster.circle) map.removeLayer(cluster.circle);
+            });
+            
+            // Remover rota
+            if (controleRota) {
+                map.removeControl(controleRota);
+                controleRota = null;
+            }
+            
+            // Reiniciar arrays
+            pontos = [];
+            marcadores = [];
+            clusters = [];
+            
+            atualizarLista();
+        }
+        
+        // Implementação do algoritmo K-means
+        function kmeans(points, k, maxIterations = 100) {
+            if (points.length < k) {
+                alert('Número de pontos é menor que o número de clusters solicitado');
+                return null;
+            }
+            
+            // Inicializar centróides aleatoriamente
+            let centroids = [];
+            let usedIndexes = [];
+            
+            for (let i = 0; i < k; i++) {
+                let randomIndex;
+                do {
+                    randomIndex = Math.floor(Math.random() * points.length);
+                } while (usedIndexes.includes(randomIndex));
+                
+                usedIndexes.push(randomIndex);
+                centroids.push(points[randomIndex]);
+            }
+            
+            let assignments = new Array(points.length).fill(-1);
+            let changed = true;
+            let iterations = 0;
+            
+            while (changed && iterations < maxIterations) {
+                changed = false;
+                iterations++;
+                
+                // Atribuir pontos ao centróide mais próximo
+                for (let i = 0; i < points.length; i++) {
+                    let minDist = Infinity;
+                    let bestCentroid = -1;
+                    
+                    for (let j = 0; j < centroids.length; j++) {
+                        let dist = haversineDistance(
+                            points[i][0], points[i][1],
+                            centroids[j][0], centroids[j][1]
+                        );
+                        
+                        if (dist < minDist) {
+                            minDist = dist;
+                            bestCentroid = j;
+                        }
+                    }
+                    
+                    if (assignments[i] !== bestCentroid) {
+                        changed = true;
+                        assignments[i] = bestCentroid;
+                    }
+                }
+                
+                // Recalcular centróides
+                let newCentroids = new Array(k).fill(null).map(() => [0, 0, 0]);
+                
+                for (let i = 0; i < points.length; i++) {
+                    let centroidIndex = assignments[i];
+                    newCentroids[centroidIndex][0] += points[i][0];
+                    newCentroids[centroidIndex][1] += points[i][1];
+                    newCentroids[centroidIndex][2] += 1; // contador
+                }
+                
+                for (let i = 0; i < k; i++) {
+                    if (newCentroids[i][2] > 0) {
+                        centroids[i] = [
+                            newCentroids[i][0] / newCentroids[i][2],
+                            newCentroids[i][1] / newCentroids[i][2]
+                        ];
+                    }
+                }
+            }
+            
+            return {
+                centroids: centroids,
+                assignments: assignments,
+                iterations: iterations
+            };
+        }
+        
+        // Calcula a distância entre dois pontos geográficos (fórmula de Haversine)
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Raio da Terra em km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+                
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        
+        // Agrupa os pontos usando K-means
+        function agruparKMeans() {
+            if (pontos.length < 2) {
+                alert('Adicione pelo menos 2 pontos para clusterizar');
+                return;
+            }
+            
+            let k = parseInt(document.getElementById('numClusters').value);
+            if (isNaN(k) || k < 2 || k > 10) {
+                alert('Por favor, insira um número válido de clusters (2-10)');
+                return;
+            }
+            
+            // Executar K-means
+            let resultado = kmeans(pontos, k);
+            if (!resultado) return;
+            
+            // Limpar clusters anteriores
+            clusters.forEach(cluster => {
+                if (cluster.marker) map.removeLayer(cluster.marker);
+                if (cluster.circle) map.removeLayer(cluster.circle);
+            });
+            clusters = [];
+            
+            // Definir cores para os clusters
+            const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', 
+                           '#1abc9c', '#d35400', '#c0392b', '#16a085', '#8e44ad'];
+            
+            // Adicionar marcadores de cluster e círculos
+            resultado.centroids.forEach((centroid, i) => {
+                // Calcular raio do cluster (distância máxima até o centróide)
+                let maxDistance = 0;
+                pontos.forEach((p, j) => {
+                    if (resultado.assignments[j] === i) {
+                        let distance = haversineDistance(
+                            centroid[0], centroid[1],
+                            p[0], p[1]
+                        );
+                        if (distance > maxDistance) maxDistance = distance;
+                    }
+                });
+                
+                // Converter distância para graus (aproximação)
+                let radiusDegrees = maxDistance / 111.32;
+                
+                // Criar círculo do cluster
+                let circle = L.circle(centroid, {
+                    color: colors[i % colors.length],
+                    fillColor: colors[i % colors.length],
+                    fillOpacity: 0.2,
+                    radius: radiusDegrees * 1000 // converter para metros
+                }).addTo(map);
+                
+                // Criar marcador do centróide
+                let marker = L.marker(centroid, {
+                    icon: L.divIcon({
+                        className: 'cluster-marker',
+                        html: `<div style="background-color: ${colors[i % colors.length]}; width: 30px; height: 30px; border-radius: 50%; color: white; line-height: 30px;">${i+1}</div>`,
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15]
+                    })
+                }).addTo(map).bindPopup(`<b>Cluster ${i+1}</b><br>${pontos.filter((p, j) => resultado.assignments[j] === i).length} pontos`);
+                
+                clusters.push({ marker, circle });
+            });
+            
+            // Atualizar marcadores com cores do cluster
+            marcadores.forEach((marker, i) => {
+                let clusterIndex = resultado.assignments[i];
+                marker.setIcon(L.divIcon({
+                    className: 'point-marker',
+                    html: `<div style="background-color: ${colors[clusterIndex % colors.length]}; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 3px rgba(0,0,0,0.5);"></div>`,
+                    iconSize: [15, 15],
+                    iconAnchor: [7.5, 7.5]
+                }));
+            });
+            
+            alert(`Clusterização concluída em ${resultado.iterations} iterações!`);
+        }
+        
+        // Traçar rota entre todos os pontos
+        function tracarRota() {
+            if (pontos.length < 2) {
+                alert('Adicione pelo menos 2 pontos para traçar uma rota');
+                return;
+            }
+            
+            // Remover rota anterior se existir
+            if (controleRota) {
+                map.removeControl(controleRota);
+            }
+            
+            // Criar waypoints para a rota
+            let waypoints = pontos.map(p => L.latLng(p[0], p[1]));
+            
+            // Adicionar controle de rota
+            controleRota = L.Routing.control({
+                waypoints: waypoints,
+                routeWhileDragging: false,
+                showAlternatives: false,
+                lineOptions: {
+                    styles: [{color: '#3498db', opacity: 0.7, weight: 5}]
+                },
+                createMarker: function() { return null; } // Não criar marcadores extras
+            }).addTo(map);
+        }
+        
+        // Otimizar rota usando OSRM
+        function otimizarRota() {
+            if (pontos.length < 2) {
+                alert('Adicione pelo menos 2 pontos para otimizar a rota');
+                return;
+            }
+            
+            // Formatar coordenadas para a API OSRM
+            let coords = pontos.map(p => `${p[1]},${p[0]}`).join(';');
+            
+            fetch(`https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&roundtrip=false&annotations=true&geometries=geojson`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.code === 'Ok') {
+                        // Reordenar pontos conforme a otimização
+                        let novaOrdem = data.trips[0].waypoints.map(w => [w.location[1], w.location[0]]);
+                        
+                        // Atualizar pontos e marcadores
+                        pontos = novaOrdem;
+                        marcadores.forEach(m => map.removeLayer(m));
+                        marcadores = [];
+                        
+                        pontos.forEach((p, i) => {
+                            let marker = L.marker([p[0], p[1]])
+                                .addTo(map)
+                                .bindPopup(`Ponto ${i+1}`);
+                            marcadores.push(marker);
+                        });
+                        
+                        atualizarLista();
+                        tracarRota();
+                        alert('Rota otimizada com sucesso!');
+                    } else {
+                        alert('Erro ao otimizar a rota: ' + data.code);
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro na otimização da rota:', err);
+                    alert('Erro ao conectar com o servidor de roteamento');
+                });
+        }
+    </script>
 </body>
 </html>
