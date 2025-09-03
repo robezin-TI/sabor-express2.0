@@ -1,146 +1,143 @@
-// Inicializa o mapa
-const map = L.map('map').setView([-23.55052, -46.633308], 13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors'
+let map = L.map("map").setView([-23.5505, -46.6333], 13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap"
 }).addTo(map);
 
-let markers = [];
-let routeLine = null;
+let points = [];
+let routeLayer;
+const clusterColors = ["red","blue","green","orange","purple","brown","teal","pink","gray","black"];
 
-// Inicializa Sortable (drag & drop)
-const listEl = document.getElementById('list');
-Sortable.create(listEl, {
-  animation: 150,
-  onEnd: updateRoute
-});
-
-// Adiciona marcador
-function addMarker(latlng, label) {
-  const marker = L.marker(latlng, { draggable: true })
-    .addTo(map)
-    .bindPopup(label);
-
-  marker.on('dragend', updateRoute);
-  markers.push(marker);
-
-  addListItem(label);
-  updateRoute();
+// Adicionar ponto manualmente
+function addPoint(lat, lng, label) {
+  points.push({ lat, lng, label });
+  updateList();
+  applyKMeans(3);
 }
 
-// Adiciona item na lista
-function addListItem(label) {
-  const div = document.createElement('div');
-  div.className = 'stop';
-  div.innerHTML = `
-    <div class="handle">≡</div>
-    <input value="${label}" />
-    <button class="x">×</button>
-  `;
-  listEl.appendChild(div);
-
-  // Remover
-  div.querySelector('.x').addEventListener('click', () => {
-    const idx = Array.from(listEl.children).indexOf(div);
-    map.removeLayer(markers[idx]);
-    markers.splice(idx, 1);
-    div.remove();
-    updateRoute();
-  });
-}
-
-// Geocoding
-async function geocode(address) {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.length > 0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-  return null;
-}
-
-// Atualizar rota
-async function updateRoute() {
-  if (markers.length < 2) {
-    if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
-    document.getElementById('directions').classList.add('hidden');
-    return;
-  }
-
-  const coords = markers.map(m => `${m.getLatLng().lng},${m.getLatLng().lat}`).join(';');
-  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`;
-
-  const res = await fetch(url);
-  const data = await res.json();
-
-  if (data.code === 'Ok') {
-    const route = data.routes[0];
-    const latlngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
-
-    if (routeLine) map.removeLayer(routeLine);
-    routeLine = L.polyline(latlngs, { color: '#2563eb', weight: 5 }).addTo(map);
-    map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
-
-    // resumo
-    const summary = `${(route.distance/1000).toFixed(2)} km, ${(route.duration/60).toFixed(0)} min`;
-    document.getElementById('dir-summary').innerText = summary;
-
-    const stepsContainer = document.getElementById('dir-steps');
-    stepsContainer.innerHTML = '';
-    route.legs.forEach(leg => {
-      leg.steps.forEach((step, i) => {
-        const li = document.createElement('li');
-        li.className = 'dir-step';
-        li.innerHTML = `
-          <div class="dir-ico">${i+1}</div>
-          <div class="dir-txt">${step.maneuver.instruction}</div>
-        `;
-        stepsContainer.appendChild(li);
-      });
-    });
-
-    document.getElementById('directions').classList.remove('hidden');
-  }
-}
-
-// K-Means
-document.getElementById('kmeans').addEventListener('click', () => {
-  if (markers.length < 2) return;
-
-  const data = markers.map(m => [m.getLatLng().lat, m.getLatLng().lng]);
-  const nClusters = Math.min(3, markers.length); // até 3 clusters
-  const result = mlKmeans(data, nClusters);
-
-  const colors = ['red', 'green', 'blue'];
-
-  markers.forEach((m, i) => {
-    const cluster = result.clusters[i];
-    const color = colors[cluster % colors.length];
-    const icon = L.divIcon({
-      className: 'cluster-halo',
-      html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;opacity:0.5"></div>`,
-      iconSize: [28, 28],
-      iconAnchor: [14, 14]
-    });
-    m.setIcon(icon);
-  });
-});
-
-// Eventos
-map.on('click', e => addMarker(e.latlng, `Ponto ${markers.length + 1}`));
-
-document.getElementById('add').addEventListener('click', async () => {
-  const input = document.getElementById('search');
-  const address = input.value.trim();
+// Geocodificação por endereço
+function addAddress() {
+  const address = document.getElementById("address").value;
   if (!address) return;
-  const latlng = await geocode(address);
-  if (latlng) {
-    addMarker(latlng, address);
-    map.setView(latlng, 14);
-    input.value = '';
-  } else alert('Endereço não encontrado!');
-});
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${address}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.length > 0) {
+        addPoint(parseFloat(data[0].lat), parseFloat(data[0].lon), address);
+      }
+    });
+  document.getElementById("address").value = "";
+}
 
-document.getElementById('route').addEventListener('click', updateRoute);
-document.getElementById('clear').addEventListener('click', () => location.reload());
-document.getElementById('close-directions').addEventListener('click', () => {
-  document.getElementById('directions').classList.add('hidden');
-});
+// Atualizar lista com drag and drop
+function updateList() {
+  const list = document.getElementById("points");
+  list.innerHTML = "";
+  points.forEach((p, i) => {
+    const li = document.createElement("li");
+    li.textContent = p.label || `Ponto ${i+1}`;
+    const btn = document.createElement("button");
+    btn.textContent = "x";
+    btn.onclick = () => { removePoint(i); };
+    li.appendChild(btn);
+    list.appendChild(li);
+  });
+
+  Sortable.create(list, {
+    animation: 150,
+    onEnd: function (evt) {
+      const moved = points.splice(evt.oldIndex, 1)[0];
+      points.splice(evt.newIndex, 0, moved);
+      applyKMeans(3);
+    }
+  });
+}
+
+// Remover ponto
+function removePoint(i) {
+  points.splice(i, 1);
+  updateList();
+  applyKMeans(3);
+}
+
+// Limpar tudo
+function clearAll() {
+  points = [];
+  if (routeLayer) map.removeLayer(routeLayer);
+  updateList();
+  document.getElementById("route-summary").innerHTML = "";
+}
+
+// Traçar rota
+function drawRoute() {
+  if (points.length < 2) return;
+  const coords = points.map(p => `${p.lng},${p.lat}`).join(";");
+  fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`)
+    .then(res => res.json())
+    .then(data => {
+      if (routeLayer) map.removeLayer(routeLayer);
+      routeLayer = L.geoJSON(data.routes[0].geometry).addTo(map);
+      map.fitBounds(routeLayer.getBounds());
+      showSummary(data.routes[0]);
+    });
+}
+
+// Otimizar rota
+function optimizeRoute() {
+  if (points.length < 2) return;
+  const coords = points.map(p => `${p.lng},${p.lat}`).join(";");
+  fetch(`https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&destination=last&roundtrip=false&overview=full&geometries=geojson&steps=true`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data.trips || data.trips.length === 0) return;
+      if (routeLayer) map.removeLayer(routeLayer);
+      routeLayer = L.geoJSON(data.trips[0].geometry).addTo(map);
+      map.fitBounds(routeLayer.getBounds());
+      showSummary(data.trips[0]);
+    });
+}
+
+// Mostrar resumo da rota
+function showSummary(route) {
+  let html = `<b>Resumo da rota</b><br>${(route.distance/1000).toFixed(2)} km, ${(route.duration/60).toFixed(0)} min<ul>`;
+  route.legs.forEach(leg => {
+    leg.steps.forEach(step => {
+      const instr = step.maneuver.instruction || `${step.maneuver.type} ${step.name || ""}`;
+      html += `<li>${instr}</li>`;
+    });
+  });
+  html += "</ul>";
+  document.getElementById("route-summary").innerHTML = html;
+}
+
+// Aplicar KMeans
+function applyKMeans(k=3) {
+  if (points.length < k) return;
+
+  const coords = points.map(p => [p.lat, p.lng]);
+  ml5.kmeans(coords, k, clusters => {
+    clusters.forEach((c, i) => {
+      const color = clusterColors[c.cluster % clusterColors.length];
+      if (points[i].marker) map.removeLayer(points[i].marker);
+
+      const icon = L.divIcon({
+        className: "custom-cluster-icon",
+        html: `<div style="
+          background:${color};
+          color:white;
+          width:28px;
+          height:28px;
+          border-radius:50%;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          font-size:14px;
+          font-weight:bold;
+          border:2px solid white;
+        ">${c.cluster+1}</div>`,
+        iconSize: [28,28]
+      });
+
+      points[i].marker = L.marker([points[i].lat, points[i].lng], { icon }).addTo(map);
+    });
+  });
+}
