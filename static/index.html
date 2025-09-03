@@ -134,14 +134,51 @@
         
         #lista-pontos li {
             padding: 10px;
-            border-bottom: 1px solid #eee;
+            border: 1px solid #ddd;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background-color: white;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            cursor: grab;
+            transition: all 0.2s;
         }
         
         #lista-pontos li:last-child {
-            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        #lista-pontos li:hover {
+            background-color: #f8f9fa;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        #lista-pontos li.dragging {
+            background-color: #e3f2fd;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            opacity: 0.8;
+        }
+        
+        .drag-handle {
+            cursor: grab;
+            margin-right: 10px;
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+        
+        .point-number {
+            background-color: #3498db;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-size: 12px;
+            font-weight: bold;
         }
         
         .cluster-controls {
@@ -201,7 +238,7 @@
             overflow-y: auto;
             width: 300px;
             margin-top: 60px;
-            margin-right: 10px;
+            margin-left: 360px;
         }
         
         .leaflet-control-container .leaflet-top {
@@ -225,6 +262,29 @@
             border-radius: 4px;
             margin: 10px 0;
         }
+        
+        .drag-instructions {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .cluster-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .cluster-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .cluster-buttons button {
+            flex: 1;
+        }
     </style>
 </head>
 <body>
@@ -236,7 +296,7 @@
             <button class="add-btn" onclick="adicionarEndereco()">Adicionar Ponto</button>
         </div>
         
-        <h3>Pontos de Entrega</h3>
+        <h3>Pontos de Entrega <span class="drag-instructions">(Arraste para reordenar)</span></h3>
         <ul id="lista-pontos"></ul>
         
         <div class="cluster-controls">
@@ -247,17 +307,23 @@
             </div>
         </div>
         
-        <div class="buttons">
-            <button class="blue" onclick="otimizarRota()">Otimizar Rota</button>
-            <button class="green" onclick="tracarRota()">Traçar Rota</button>
-            <button class="red" onclick="limparTudo()">Limpar Tudo</button>
+        <div class="cluster-section">
+            <h3>Gerenciar Rotas</h3>
+            <div class="cluster-buttons">
+                <button class="blue" onclick="otimizarRota()">Otimizar Rota</button>
+                <button class="green" onclick="tracarRota()">Traçar Rota</button>
+            </div>
+            <div class="cluster-buttons">
+                <button class="gray" onclick="tracarRotaCluster()">Rota por Cluster</button>
+                <button class="red" onclick="limparTudo()">Limpar Tudo</button>
+            </div>
         </div>
         
         <div class="loading" id="loading">Processando, aguarde...</div>
         <div class="error-message" id="error-message"></div>
         
         <div class="cluster-info">
-            <strong>Como funciona:</strong> O algoritmo K-means agrupa os pontos de entrega por proximidade geográfica, facilitando o roteamento e reduzindo distâncias percorridas.
+            <strong>Como funciona:</strong> O algoritmo K-means agrupa os pontos de entrega por proximidade geográfica. Use o drag and drop para reorganizar manualmente a ordem das entregas.
         </div>
         
         <p class="info">Geocodificação: Nominatim (OSM). Roteamento: OSRM.</p>
@@ -274,7 +340,7 @@
     
     <script>
         // Inicialização do mapa
-        let map = L.map('map').setView([-23.533773, -46.625290], 12); // Posição inicial: São Paulo
+        let map = L.map('map').setView([-23.533773, -46.625290], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
@@ -283,8 +349,9 @@
         let pontos = [];
         let marcadores = [];
         let clusters = [];
-        let controleRota = null;
-        let routingControl = null;
+        let clusterAssignments = [];
+        let routingControls = [];
+        let dragSrcEl = null;
         
         // Clique no mapa para adicionar ponto
         map.on('click', function(e) {
@@ -329,6 +396,7 @@
                 
             marcadores.push(marker);
             atualizarLista();
+            initDragAndDrop();
         }
         
         // Atualiza a lista de pontos na sidebar
@@ -338,8 +406,122 @@
             
             pontos.forEach((p, i) => {
                 let li = document.createElement('li');
-                li.innerHTML = `Ponto ${i+1} <button onclick="removerPonto(${i})" class="red">X</button>`;
+                li.setAttribute('data-index', i);
+                li.draggable = true;
+                
+                li.innerHTML = `
+                    <div>
+                        <span class="point-number">${i+1}</span>
+                        <span class="drag-handle">☰</span>
+                        Ponto ${i+1}
+                    </div>
+                    <button onclick="removerPonto(${i})" class="red">X</button>
+                `;
+                
                 lista.appendChild(li);
+            });
+        }
+        
+        // Inicializar funcionalidade de drag and drop
+        function initDragAndDrop() {
+            const lista = document.getElementById('lista-pontos');
+            const items = lista.getElementsByTagName('li');
+            
+            // Remover event listeners anteriores para evitar duplicação
+            for (let item of items) {
+                item.ondragstart = null;
+                item.ondragenter = null;
+                item.ondragover = null;
+                item.ondragleave = null;
+                item.ondrop = null;
+                item.ondragend = null;
+            }
+            
+            // Adicionar event listeners
+            for (let item of items) {
+                item.ondragstart = handleDragStart;
+                item.ondragenter = handleDragEnter;
+                item.ondragover = handleDragOver;
+                item.ondragleave = handleDragLeave;
+                item.ondrop = handleDrop;
+                item.ondragend = handleDragEnd;
+            }
+        }
+        
+        // Manipuladores de eventos para drag and drop
+        function handleDragStart(e) {
+            this.classList.add('dragging');
+            dragSrcEl = this;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.getAttribute('data-index'));
+        }
+        
+        function handleDragEnter(e) {
+            this.classList.add('drag-over');
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+        
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+        
+        function handleDragEnd(e) {
+            const items = document.querySelectorAll('#lista-pontos li');
+            items.forEach(item => {
+                item.classList.remove('drag-over');
+                item.classList.remove('dragging');
+            });
+        }
+        
+        function handleDrop(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            if (dragSrcEl !== this) {
+                const fromIndex = parseInt(dragSrcEl.getAttribute('data-index'));
+                const toIndex = parseInt(this.getAttribute('data-index'));
+                
+                // Reordenar arrays
+                reordenarPontos(fromIndex, toIndex);
+                
+                // Atualizar a lista
+                atualizarLista();
+                initDragAndDrop();
+                
+                // Se já existir rota, atualizar
+                if (routingControls.length > 0) {
+                    tracarRota();
+                }
+            }
+            
+            this.classList.remove('drag-over');
+            return false;
+        }
+        
+        // Reordenar pontos e marcadores
+        function reordenarPontos(fromIndex, toIndex) {
+            // Mover item no array de pontos
+            const pontoMovido = pontos.splice(fromIndex, 1)[0];
+            pontos.splice(toIndex, 0, pontoMovido);
+            
+            // Mover item no array de marcadores
+            const marcadorMovido = marcadores.splice(fromIndex, 1)[0];
+            marcadores.splice(toIndex, 0, marcadorMovido);
+            
+            // Mover item no array de assignments de cluster se existir
+            if (clusterAssignments.length > 0) {
+                const assignmentMovido = clusterAssignments.splice(fromIndex, 1)[0];
+                clusterAssignments.splice(toIndex, 0, assignmentMovido);
+            }
+            
+            // Atualizar popups com novos números
+            marcadores.forEach((marker, i) => {
+                marker.setPopupContent(`Ponto ${i+1}`);
             });
         }
         
@@ -348,7 +530,12 @@
             map.removeLayer(marcadores[index]);
             pontos.splice(index, 1);
             marcadores.splice(index, 1);
+            if (clusterAssignments.length > 0) {
+                clusterAssignments.splice(index, 1);
+            }
             atualizarLista();
+            initDragAndDrop();
+            limparRotas();
         }
         
         // Limpa todos os pontos e rotas
@@ -362,19 +549,25 @@
                 if (cluster.circle) map.removeLayer(cluster.circle);
             });
             
-            // Remover rota
-            if (routingControl) {
-                map.removeControl(routingControl);
-                routingControl = null;
-            }
+            // Remover rotas
+            limparRotas();
             
             // Reiniciar arrays
             pontos = [];
             marcadores = [];
             clusters = [];
+            clusterAssignments = [];
             
             atualizarLista();
             hideError();
+        }
+        
+        // Limpar todas as rotas
+        function limparRotas() {
+            routingControls.forEach(control => {
+                map.removeControl(control);
+            });
+            routingControls = [];
         }
         
         // Mostrar/ocultar loading
@@ -505,12 +698,18 @@
             let resultado = kmeans(pontos, k);
             if (!resultado) return;
             
+            // Salvar assignments para uso posterior
+            clusterAssignments = resultado.assignments;
+            
             // Limpar clusters anteriores
             clusters.forEach(cluster => {
                 if (cluster.marker) map.removeLayer(cluster.marker);
                 if (cluster.circle) map.removeLayer(cluster.circle);
             });
             clusters = [];
+            
+            // Limpar rotas anteriores
+            limparRotas();
             
             // Definir cores para os clusters
             const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', 
@@ -551,7 +750,7 @@
                     })
                 }).addTo(map).bindPopup(`<b>Cluster ${i+1}</b><br>${pontos.filter((p, j) => resultado.assignments[j] === i).length} pontos`);
                 
-                clusters.push({ marker, circle });
+                clusters.push({ marker, circle, color: colors[i % colors.length] });
             });
             
             // Atualizar marcadores com cores do cluster
@@ -575,31 +774,72 @@
                 return;
             }
             
-            // Remover rota anterior se existir
-            if (routingControl) {
-                map.removeControl(routingControl);
-                routingControl = null;
-            }
+            // Limpar rotas anteriores
+            limparRotas();
             
             // Criar waypoints para a rota
             let waypoints = pontos.map(p => L.latLng(p[0], p[1]));
             
-            // Adicionar controle de rota com posicionamento correto
-            routingControl = L.Routing.control({
+            // Adicionar controle de rota
+            let control = L.Routing.control({
                 waypoints: waypoints,
                 routeWhileDragging: false,
                 showAlternatives: false,
                 lineOptions: {
                     styles: [{color: '#3498db', opacity: 0.7, weight: 5}]
                 },
-                createMarker: function() { return null; }, // Não criar marcadores extras
+                createMarker: function() { return null; },
                 fitSelectedRoutes: true,
                 show: true,
                 collapsible: true
             }).addTo(map);
             
-            // Reposicionar o container de rotas para não cobrir a sidebar
-            document.querySelector('.leaflet-routing-container').style.marginLeft = '350px';
+            routingControls.push(control);
+        }
+        
+        // Traçar rotas por cluster
+        function tracarRotaCluster() {
+            if (clusterAssignments.length === 0) {
+                alert('Primeiro agrupe os pontos usando K-means');
+                return;
+            }
+            
+            // Limpar rotas anteriores
+            limparRotas();
+            
+            // Calcular número de clusters
+            const numClusters = Math.max(...clusterAssignments) + 1;
+            
+            // Para cada cluster, traçar uma rota
+            for (let i = 0; i < numClusters; i++) {
+                // Obter pontos deste cluster
+                let clusterPoints = [];
+                pontos.forEach((p, j) => {
+                    if (clusterAssignments[j] === i) {
+                        clusterPoints.push(L.latLng(p[0], p[1]));
+                    }
+                });
+                
+                if (clusterPoints.length > 1) {
+                    // Adicionar controle de rota para este cluster
+                    let control = L.Routing.control({
+                        waypoints: clusterPoints,
+                        routeWhileDragging: false,
+                        showAlternatives: false,
+                        lineOptions: {
+                            styles: [{color: clusters[i].color, opacity: 0.7, weight: 5}]
+                        },
+                        createMarker: function() { return null; },
+                        fitSelectedRoutes: false,
+                        show: false,
+                        collapsible: false
+                    }).addTo(map);
+                    
+                    routingControls.push(control);
+                }
+            }
+            
+            alert(`Rotas traçadas para ${numClusters} clusters!`);
         }
         
         // Otimizar rota usando OSRM
@@ -658,6 +898,7 @@
                             });
                             
                             atualizarLista();
+                            initDragAndDrop();
                             tracarRota();
                             alert('Rota otimizada com sucesso!');
                         } else {
@@ -673,6 +914,11 @@
             // Iniciar tentativas com os servidores
             tryNextServer();
         }
+        
+        // Inicializar drag and drop quando o documento estiver pronto
+        document.addEventListener('DOMContentLoaded', function() {
+            initDragAndDrop();
+        });
     </script>
 </body>
 </html>
