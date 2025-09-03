@@ -1,51 +1,92 @@
-import os
 from flask import Flask, request, jsonify, send_from_directory
-from api.geocode import geocode_address
-from api.optimizer import optimize_routes
-from api.clustering import kmeans_clusters
-from api.ml_model import MODEL
+from flask_cors import CORS
+import requests
+import os
 
-app = Flask(__name__, static_folder="static", static_url_path="")
+app = Flask(__name__)
+CORS(app)  # Permitir requisições de diferentes origens
 
-# ---------- Static ----------
-@app.route("/")
-def index():
-    return send_from_directory("static", "index.html")
+# Servir a página principal
+@app.route('/')
+def serve_index():
+    return send_from_directory('.', 'index.html')
 
-# ---------- API ----------
-@app.route("/api/geocode", methods=["POST"])
-def api_geocode():
-    data = request.get_json(silent=True) or {}
-    address = data.get("address", "")
-    res = geocode_address(address)
-    return jsonify(res), (200 if "error" not in res else 400)
+# Servir arquivos estáticos (CSS, JS, etc)
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_from_directory('.', path)
 
-@app.route("/api/astar", methods=["POST"])
-def api_astar():
-    data = request.get_json(silent=True) or {}
-    points = data.get("points", [])
-    if len(points) < 2:
-        return jsonify({"error": "Envie ao menos 2 pontos"}), 400
-    nodes, dist_km, time_min = optimize_routes(points)
-    return jsonify({"nodes": nodes, "distance_km": dist_km, "time_min": time_min})
+# API para geocodificação
+@app.route('/api/geocode', methods=['GET'])
+def geocode():
+    address = request.args.get('address')
+    if not address:
+        return jsonify({"error": "Endereço não fornecido"}), 400
+    
+    try:
+        # Usar Nominatim para geocodificação
+        response = requests.get(
+            f"https://nominatim.openstreetmap.org/search?format=json&q={address}&limit=1",
+            headers={'User-Agent': 'SaborExpressApp/1.0'}
+        )
+        data = response.json()
+        
+        if data:
+            return jsonify({
+                "lat": float(data[0]['lat']),
+                "lon": float(data[0]['lon']),
+                "name": data[0]['display_name']
+            })
+        else:
+            return jsonify({"error": "Endereço não encontrado"}), 404
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-@app.route("/api/cluster", methods=["POST"])
-def api_cluster():
-    data = request.get_json(silent=True) or {}
-    points = data.get("points", [])
-    k = int(data.get("k", 2))
-    res = kmeans_clusters(points, k=k)
-    return jsonify(res)
+# API para otimização de rota
+@app.route('/api/optimize-route', methods=['POST'])
+def optimize_route():
+    try:
+        data = request.json
+        points = data.get('points', [])
+        
+        if len(points) < 2:
+            return jsonify({"error": "Pelo menos 2 pontos são necessários"}), 400
+        
+        # Formatar coordenadas para OSRM
+        coords = ";".join([f"{point['lon']},{point['lat']}" for point in points])
+        
+        # Tentar diferentes servidores OSRM
+        servers = [
+            'https://router.project-osrm.org',
+            'https://osrm.saas.work', 
+            'https://routing.openstreetmap.de'
+        ]
+        
+        for server in servers:
+            try:
+                response = requests.get(
+                    f"{server}/trip/v1/driving/{coords}?source=first&roundtrip=false&annotations=true&geometries=geojson"
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('code') == 'Ok':
+                        # Retornar pontos otimizados
+                        optimized_points = [
+                            [waypoint['location'][1], waypoint['location'][0]] 
+                            for waypoint in data['trips'][0]['waypoints']
+                        ]
+                        return jsonify({"optimized_route": optimized_points})
+                
+            except requests.RequestException:
+                continue  # Tentar próximo servidor
+        
+        return jsonify({"error": "Todos os servidores de roteamento indisponíveis"}), 503
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-@app.route("/api/ml/predict", methods=["POST"])
-def api_predict():
-    data = request.get_json(silent=True) or {}
-    distance_km = float(data.get("distance_km", 0))
-    stops = int(data.get("stops", 0))
-    pred = MODEL.predict(distance_km, stops)
-    return jsonify({"prediction_min": round(pred, 2)})
-
-# ---------- Run ----------
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
