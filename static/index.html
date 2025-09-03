@@ -5,51 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sabor Express</title>
   <link rel="stylesheet" href="style.css">
-
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-  <!-- Leaflet Routing Machine -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
-  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
-
-  <!-- SortableJS -->
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-
-  <!-- ml-kmeans -->
-  <script src="https://cdn.jsdelivr.net/npm/ml-kmeans@4.0.0/lib/index.min.js"></script>
+  <script src="https://unpkg.com/sortablejs@1.14.0/Sortable.min.js"></script>
+  <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
 </head>
 <body>
-  <div id="app">
-    <div id="sidebar">
-      <h2>Sabor Express</h2>
-      <input id="search" type="text" placeholder="Digite um endereço (ou clique no mapa)">
-      <button id="add">Adicionar</button>
-      <div id="list"></div>
+  <div id="sidebar">
+    <h2>Sabor Express</h2>
+    <input id="address" type="text" placeholder="Digite um endereço (ou clique no mapa)">
+    <button onclick="addAddress()">Adicionar</button>
 
-      <div class="buttons">
-        <button id="optimize" class="primary">Otimizar rota (OSRM)</button>
-        <button id="route" class="secondary">Traçar rota</button>
-        <button id="kmeans" class="secondary">K-Means</button>
-        <button id="clear" class="danger">Limpar tudo</button>
-      </div>
+    <ul id="points"></ul>
 
-      <p class="note">Arraste os itens para reordenar (A, B, C...).</p>
-      <p class="note">Geocodificação: Nominatim (OSM), Roteamento: OSRM.</p>
-    </div>
+    <button onclick="optimizeRoute()" class="btn-primary">Otimizar rota (OSRM)</button>
+    <button onclick="drawRoute()" class="btn-secondary">Traçar rota</button>
+    <button onclick="clearAll()" class="btn-danger">Limpar tudo</button>
 
-    <div id="map"></div>
-
-    <div id="directions" class="hidden">
-      <div id="dir-header">
-        <h3>Resumo da rota</h3>
-        <span id="close-directions">×</span>
-      </div>
-      <div id="dir-summary"></div>
-      <ul id="dir-steps"></ul>
-    </div>
+    <p>Geocodificação: Nominatim (OSM). Roteamento: OSRM.</p>
   </div>
+
+  <div id="map"></div>
+  <div id="route-summary"></div>
 
   <script src="script.js"></script>
 </body>
