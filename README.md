@@ -152,10 +152,6 @@ LEAFLET ROUTING MACHINE. Leaflet Routing Machine Plugin. Disponível em: https:/
 
 SORTABLE JS. Sortable - JavaScript library for reorderable drag-and-drop lists. Disponível em: https://github.com/SortableJS/Sortable
 
-MACQUEEN, J. Some Methods for Classification and Analysis of Multivariate Observations. Proceedings of the Fifth Berkeley Symposium on Mathematical Statistics and Probability, 1967.
-
-HAVERSINE, R. W. Navigation Formulas - Great Circle Distance Calculation. Nautical Almanac, 1805.
-EOF
 
 
 
