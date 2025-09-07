@@ -1,61 +1,45 @@
-#  Sabor Express – Otimizador de Rotas
+# README.md
+cat > README.md << 'EOF'
+# Sabor Express 2.0
 
-Aplicação simples para **criar, reorganizar e otimizar rotas de entrega** usando:
+Sistema de otimização de rotas de entrega com clusterização geográfica utilizando algoritmos K-means e integração com serviços de mapas.
 
-- [Leaflet](https://leafletjs.com/) para mapas  
-- [OSRM](http://project-osrm.org/) para cálculo de rotas  
-- [Nominatim](https://nominatim.org/) para geocodificação de endereços  
-- [SortableJS](https://sortablejs.github.io/Sortable/) para reordenar pontos da rota  
-- Servido via **Nginx** em um container **Docker**
+## Funcionalidades
 
----
+- Geocodificação de endereços via Nominatim (OpenStreetMap)
+- Clusterização de pontos de entrega usando algoritmo K-means
+- Otimização de rotas usando OSRM (Open Source Routing Machine)
+- Interface interativa com mapa Leaflet
+- Reordenamento manual de pontos via drag and drop
+- Visualização de rotas por cluster
 
-##  Funcionalidades
+## Tecnologias Utilizadas
 
-✅ Adicionar pontos manualmente ou clicando no mapa  
-✅ Ícones A, B, C... personalizados para cada parada  
-✅ Lista lateral com arrastar para reordenar paradas 
+- Backend: Python Flask
+- Frontend: HTML5, CSS3, JavaScript
+- Mapas: Leaflet.js
+- Roteamento: Leaflet Routing Machine
+- Geocodificação: Nominatim API
+- Otimização: OSRM API
+- Containerização: Docker
 
-✅ Botão para **otimizar rota automaticamente** (via OSRM Trip API)  
-✅ Rota exibida no mapa com possibilidade de ajustes  
+## Pré-requisitos
 
----
+- Python 3.8+
+- pip
+- Docker (opcional)
 
-##  Como rodar localmente
+## Instalação e Execução
 
-Clone o repositório:
+### Método 1: Com Docker (Recomendado)
 
 ```bash
-git clone https://github.com/seu-usuario/sabor-express2.0.git
+# Clone o repositório
+git clone https://github.com/robezin-TI/sabor-express2.0.git
 cd sabor-express2.0
-```
 
-## Build da imagem Docker
-
-```bash
+# Build da imagem Docker
 docker build -t sabor-express .
-```
 
-## Rodar o container
-
-```bash
-docker run -it --rm -p 8080:80 sabor-express
-```
-
-##  Estrutura do projeto
-
-```bash
-sabor-express/
- ├── static/
- │    └── index.html   # Interface da aplicação (Leaflet + OSRM + JS)
- ├── Dockerfile        # Container Nginx para servir os arquivos
- └── README.md         # Este arquivo
-```
-
-##  Créditos
-
-Mapas: [OpenStreetMap](https://www.openstreetmap.org/#map=4/-15.13/-53.19)
-
-Geocodificação: [Nominatim](https://nominatim.org/)
-
-Roteamento: [OSRM](https://project-osrm.org/)
+# Executar container
+docker run -p 5000:5000 sabor-express
