@@ -1,5 +1,5 @@
 # README.md
-cat > README.md << 'EOF'
+
 # Sabor Express 2.0
 
 Sistema de otimização de rotas de entrega com clusterização geográfica utilizando algoritmos K-means e integração com serviços de mapas.
