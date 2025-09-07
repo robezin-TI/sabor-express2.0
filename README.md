@@ -51,12 +51,6 @@ docker run -p 5000:5000 sabor-express
 git clone https://github.com/robezin-TI/sabor-express2.0.git
 cd sabor-express2.0
 
-# Criar ambiente virtual
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# ou
-venv\Scripts\activate  # Windows
-
 # Instalar dependências
 pip install -r requirements.txt
 
@@ -118,5 +112,50 @@ Resposta:
 
 Otimiza rota entre múltiplos pontos
 
-Body:
+Body: 
+
+```bash
+{
+  "points": [
+    {"lat": -23.5505, "lon": -46.6333},
+    {"lat": -23.5630, "lon": -46.6524}
+  ]
+}
+```
+
+Resposta:
+
+```bash
+{
+  "optimized_route": [
+    [-23.5505, -46.6333],
+    [-23.5630, -46.6524]
+  ]
+}
+```
+
+### Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo LICENSE para detalhes.
+
+### Bibliografia
+
+OPENSTREETMAP CONTRIBUTORS. Nominatim API Documentation. Disponível em: https://nominatim.org/release-docs/develop/api/Overview/
+
+OSRM PROJECT. Open Source Routing Machine API Documentation. Disponível em: http://project-osrm.org/docs/v5.24.0/api/
+
+LEAFLET JS. Leaflet - an open-source JavaScript library for interactive maps. Disponível em: https://leafletjs.com/reference.html
+
+FLASK PROJECT. Flask Web Development Documentation. Disponível em: https://flask.palletsprojects.com/en/2.3.x/
+
+LEAFLET ROUTING MACHINE. Leaflet Routing Machine Plugin. Disponível em: https://www.liedman.net/leaflet-routing-machine/
+
+SORTABLE JS. Sortable - JavaScript library for reorderable drag-and-drop lists. Disponível em: https://github.com/SortableJS/Sortable
+
+MACQUEEN, J. Some Methods for Classification and Analysis of Multivariate Observations. Proceedings of the Fifth Berkeley Symposium on Mathematical Statistics and Probability, 1967.
+
+HAVERSINE, R. W. Navigation Formulas - Great Circle Distance Calculation. Nautical Almanac, 1805.
+EOF
+
+
 
